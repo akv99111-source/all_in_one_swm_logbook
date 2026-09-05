@@ -330,194 +330,200 @@ export default function App() {
     <div style={{ fontFamily: 'sans-serif', background: '#f8fafc', minHeight: '100vh', padding: '15px' }}>
       <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
         
-          <div style={{ background: 'linear-gradient(135deg, #064e3b 0%, #047857 100%)', color: '#fff', padding: '20px', borderRadius: '8px', marginBottom: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
-              <div>
-                <span style={{ background: 'rgba(255,255,255,0.2)', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  <ShieldCheck size={12} /> {lang === 'hi' ? 'MULTI-ASSET SWM ESTIMATION ENGINE' : 'MULTI-ASSET SWM ESTIMATION ENGINE'}
-                </span>
-                <h1 style={{ fontSize: '22px', margin: '6px 0 2px 0', fontWeight: '800' }}>
-                  <Building2 size={22} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-                  {lang === 'hi' ? 'Integrated 3-in-1 Multi-Unit Logbook Suite' : 'Integrated 3-in-1 Multi-Unit Logbook Suite'}
-                </h1>
-              </div>
-              <button type="button" onClick={() => setLang(lang === 'hi' ? 'en' : 'hi')} style={{ padding: '6px 12px', background: '#fff', color: '#047857', border: 'none', borderRadius: '5px', fontWeight: '700', cursor: 'pointer' }}>
-                <Globe size={15} style={{ verticalAlign: 'middle' }} /> {lang === 'hi' ? 'English' : 'हिंदी'}
-              </button>
+        <div style={{ background: 'linear-gradient(135deg, #064e3b 0%, #047857 100%)', color: '#fff', padding: '20px', borderRadius: '8px', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div>
+              <span style={{ background: 'rgba(255,255,255,0.2)', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <ShieldCheck size={12} /> {lang === 'hi' ? 'MULTI-ASSET SWM ESTIMATION ENGINE' : 'MULTI-ASSET SWM ESTIMATION ENGINE'}
+              </span>
+              <h1 style={{ fontSize: '22px', margin: '6px 0 2px 0', fontWeight: '800' }}>
+                <Building2 size={22} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+                {lang === 'hi' ? 'Integrated 3-in-1 Multi-Unit Logbook Suite' : 'Integrated 3-in-1 Multi-Unit Logbook Suite'}
+              </h1>
+            </div>
+            <button type="button" onClick={() => setLang(lang === 'hi' ? 'en' : 'hi')} style={{ padding: '6px 12px', background: '#fff', color: '#047857', border: 'none', borderRadius: '5px', fontWeight: 'bold', cursor: 'pointer' }}>
+              <Globe size={15} style={{ verticalAlign: 'middle' }} /> {lang === 'hi' ? 'English' : 'हिंदी'}
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleGenerate} style={{ background: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '20px' }}>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '14px' }}>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: '600' }}>{lang === 'hi' ? 'Select State' : 'Select State'}</label>
+              <select style={inputStyle} value={selectedState} onChange={(e) => setSelectedState(e.target.value)}>
+                {STATES_LIST.map((s) => <option key={s.nameEn} value={s.nameEn}>{lang === 'hi' ? s.nameHi : s.nameEn}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: '600' }}>{lang === 'hi' ? 'ULB / Facility Name' : 'ULB / Facility Name'}</label>
+              <input style={inputStyle} type="text" required value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: '600' }}>{lang === 'hi' ? 'Mobile Number' : 'Mobile Number'}</label>
+              <input style={inputStyle} type="tel" maxLength={10} placeholder="" required value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))} />
             </div>
           </div>
 
-          <form onSubmit={handleGenerate} style={{ background: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '20px' }}>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '14px' }}>
+          <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '14px' }}>
+            <strong style={{ fontSize: '13px', display: 'block', marginBottom: '10px' }}>Gate Intake & Segregation Efficiency</strong>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', alignItems: 'center' }}>
               <div>
-                <label style={{ fontSize: '12px', fontWeight: '600' }}>{lang === 'hi' ? 'Select State' : 'Select State'}</label>
-                <select style={inputStyle} value={selectedState} onChange={(e) => setSelectedState(e.target.value)}>
-                  {STATES_LIST.map((s) => <option key={s.nameEn} value={s.nameEn}>{lang === 'hi' ? s.nameHi : s.nameEn}</option>)}
+                <label style={{ fontSize: '12px', fontWeight: '600' }}>Population (Approx.)</label>
+                <input style={inputStyle} type="number" value={population} onChange={(e) => setPopulation(e.target.value)} />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#0f172a' }}>Source Segregation Rate: {segregationRate}%</label>
+                <input type="range" min="20" max="95" step="5" value={segregationRate} onChange={(e) => setSegregationRate(Number(e.target.value))} style={{ width: '100%', marginTop: '8px' }} />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ background: '#f0fdf4', padding: '12px', borderRadius: '6px', border: '1px solid #bbf7d0', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <strong style={{ fontSize: '13px', color: '#166534' }}>Composting Assets (Wet Line)</strong>
+              <button type="button" onClick={addCompostUnit} style={{ padding: '6px 10px', background: '#047857', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Plus size={14} /> Add Compost Unit
+              </button>
+            </div>
+            {compostUnits.map((u) => (
+              <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr auto', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+                <input type="text" value={u.label} onChange={(e) => updateCompostUnit(u.id, 'label', e.target.value)} style={{ ...inputStyle, marginTop: 0 }} />
+                <select value={u.type} onChange={(e) => updateCompostUnit(u.id, 'type', e.target.value)} style={{ ...inputStyle, marginTop: 0 }}>
+                  <option value="Windrow Pad">Windrow Pad</option>
+                  <option value="Vermicompost Pit">Vermicompost Pit</option>
                 </select>
+                <input type="number" value={u.capacity} onChange={(e) => updateCompostUnit(u.id, 'capacity', e.target.value)} style={{ ...inputStyle, marginTop: 0 }} />
+                {compostUnits.length > 1 && <button type="button" onClick={() => removeCompostUnit(u.id)} style={{ color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={16} /></button>}
               </div>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '600' }}>{lang === 'hi' ? 'ULB / Facility Name' : 'ULB / Facility Name'}</label>
-                <input style={inputStyle} type="text" required value={name} onChange={(e) => setName(e.target.value)} />
-              </div>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '600' }}>{lang === 'hi' ? 'Mobile Number' : 'Mobile Number'}</label>
-                <input style={inputStyle} type="tel" maxLength={10} placeholder="" required value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))} />
-              </div>
-            </div>
+            ))}
+          </div>
 
-            <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '14px' }}>
-              <strong style={{ fontSize: '13px', display: 'block', marginBottom: '10px' }}>Gate Intake & Segregation Efficiency</strong>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', alignItems: 'center' }}>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: '600' }}>Population (Approx.)</label>
-                  <input style={inputStyle} type="number" value={population} onChange={(e) => setPopulation(e.target.value)} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#0f172a' }}>Source Segregation Rate: {segregationRate}%</label>
-                  <input type="range" min="20" max="95" step="5" value={segregationRate} onChange={(e) => setSegregationRate(Number(e.target.value))} style={{ width: '100%', marginTop: '8px' }} />
-                </div>
-              </div>
+          <div style={{ background: '#f0f9ff', padding: '12px', borderRadius: '6px', border: '1px solid #bae6fd', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <strong style={{ fontSize: '13px', color: '#0369a1' }}>MRF / Sorting Shed Assets (Dry Line)</strong>
+              <button type="button" onClick={addMrfUnit} style={{ padding: '6px 10px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Plus size={14} /> Add MRF Shed
+              </button>
             </div>
+            {mrfUnits.map((u) => (
+              <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr auto', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+                <input type="text" value={u.label} onChange={(e) => updateMrfUnit(u.id, 'label', e.target.value)} style={{ ...inputStyle, marginTop: 0 }} />
+                <select value={u.type} onChange={(e) => updateMrfUnit(u.id, 'type', e.target.value)} style={{ ...inputStyle, marginTop: 0 }}>
+                  <option value="Manual Sorting Shed">Manual Sorting Shed</option>
+                  <option value="Semi-Automated Line">Semi-Automated Line</option>
+                </select>
+                <input type="number" value={u.capacity} onChange={(e) => updateMrfUnit(u.id, 'capacity', e.target.value)} style={{ ...inputStyle, marginTop: 0 }} />
+                {mrfUnits.length > 1 && <button type="button" onClick={() => removeMrfUnit(u.id)} style={{ color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={16} /></button>}
+              </div>
+            ))}
+          </div>
 
-            <div style={{ background: '#f0fdf4', padding: '12px', borderRadius: '6px', border: '1px solid #bbf7d0', marginBottom: '14px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <strong style={{ fontSize: '13px', color: '#166534' }}>Composting Assets (Wet Line)</strong>
-                <button type="button" onClick={addCompostUnit} style={{ padding: '6px 10px', background: '#047857', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
-                  <Plus size={14} /> Add Compost Unit
+          <button type="submit" style={{ width: '100%', padding: '14px', background: '#047857', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px' }}>
+            Generate Master Dataset (₹500/mo Suite) →
+          </button>
+        </form>
+
+        {generatedMonthlyData && (
+          <div ref={resultsRef} style={{ background: '#fff', padding: '15px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <strong>{name} — Gate Dataset Preview</strong>
+              {isPaid && (
+                <button onClick={downloadExcel} style={{ padding: '6px 12px', background: '#047857', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
+                  <Download size={13} /> Export Master Excel
                 </button>
-              </div>
-              {compostUnits.map((u) => (
-                <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr auto', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
-                  <input type="text" value={u.label} onChange={(e) => updateCompostUnit(u.id, 'label', e.target.value)} style={{ ...inputStyle, marginTop: 0 }} />
-                  <select value={u.type} onChange={(e) => updateCompostUnit(u.id, 'type', e.target.value)} style={{ ...inputStyle, marginTop: 0 }}>
-                    <option value="Windrow Pad">Windrow Pad</option>
-                    <option value="Vermicompost Pit">Vermicompost Pit</option>
-                  </select>
-                  <input type="number" value={u.capacity} onChange={(e) => updateCompostUnit(u.id, 'capacity', e.target.value)} style={{ ...inputStyle, marginTop: 0 }} />
-                  {compostUnits.length > 1 && <button type="button" onClick={() => removeCompostUnit(u.id)} style={{ color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={16} /></button>}
-                </div>
-              ))}
-            </div>
-
-            <div style={{ background: '#f0f9ff', padding: '12px', borderRadius: '6px', border: '1px solid #bae6fd', marginBottom: '14px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <strong style={{ fontSize: '13px', color: '#0369a1' }}>MRF / Sorting Shed Assets (Dry Line)</strong>
-                <button type="button" onClick={addMrfUnit} style={{ padding: '6px 10px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
-                  <Plus size={14} /> Add MRF Shed
-                </button>
-              </div>
-              {mrfUnits.map((u) => (
-                <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr auto', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
-                  <input type="text" value={u.label} onChange={(e) => updateMrfUnit(u.id, 'label', e.target.value)} style={{ ...inputStyle, marginTop: 0 }} />
-                  <select value={u.type} onChange={(e) => updateMrfUnit(u.id, 'type', e.target.value)} style={{ ...inputStyle, marginTop: 0 }}>
-                    <option value="Manual Sorting Shed">Manual Sorting Shed</option>
-                    <option value="Semi-Automated Line">Semi-Automated Line</option>
-                  </select>
-                  <input type="number" value={u.capacity} onChange={(e) => updateMrfUnit(u.id, 'capacity', e.target.value)} style={{ ...inputStyle, marginTop: 0 }} />
-                  {mrfUnits.length > 1 && <button type="button" onClick={() => removeMrfUnit(u.id)} style={{ color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={16} /></button>}
-                </div>
-              ))}
-            </div>
-
-            <button type="submit" style={{ width: '100%', padding: '14px', background: '#047857', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px' }}>
-              Generate Master Dataset (₹500/mo Suite) →
-            </button>
-          </form>
-
-          {generatedMonthlyData && (
-            <div ref={resultsRef} style={{ background: '#fff', padding: '15px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <strong>{name} — Gate Dataset Preview</strong>
-                {isPaid && (
-                  <button onClick={downloadExcel} style={{ padding: '6px 12px', background: '#047857', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
-                    <Download size={13} /> Export Master Excel
-                  </button>
-                )}
-              </div>
-
-              <div onContextMenu={(e) => !isPaid && e.preventDefault()} style={{ overflowX: 'auto', border: '1px solid #cbd5e1', borderRadius: '4px', userSelect: isPaid ? 'text' : 'none' }}>
-                <table cellPadding="8" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', minWidth: '600px' }}>
-                  <thead>
-                    <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', textAlign: 'left' }}>
-                      <th>Date</th><th>Day</th><th>Gate Intake</th><th>Seg. Wet</th><th>Seg. Dry</th><th>Mixed Waste</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleRows.map((r, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                        <td>{r.date}</td><td>{r.dayName}</td>
-                        <td><strong>{formatVal(r.totalIntake)}</strong></td>
-                        <td>{formatVal(r.wetSeg)}</td>
-                        <td>{formatVal(r.drySeg)}</td>
-                        <td>{formatVal(r.unsegregatedMixed)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {!isPaid && (
-                <div style={{ border: '2px dashed #047857', background: '#ecfdf5', padding: '15px', textAlign: 'center', marginTop: '12px', borderRadius: '6px' }}>
-                  <Lock style={{ color: '#047857' }} size={18} />
-                  <h4 style={{ margin: '4px 0', color: '#065f46' }}>Preview Locked (Days 1–5 Only)</h4>
-                  <button onClick={handlePayment} disabled={isProcessing} style={{ padding: '10px 20px', background: '#047857', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: 'pointer' }}>
-                    {isProcessing ? 'Connecting...' : `Pay ₹${pricing.total} & Download File`}
-                  </button>
-                </div>
               )}
             </div>
-          )}
 
-          {/* COMPLIANCE FOOTER */}
-          <footer style={{ marginTop: '40px', paddingTop: '20px', borderTop: '1px solid #cbd5e1', textAlign: 'center', fontSize: '12px', color: '#64748b' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginBottom: '10px' }}>
-              <button type="button" onClick={() => setActivePolicyModal('contact')} style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>Contact</button>
-              <button type="button" onClick={() => setActivePolicyModal('terms')} style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>Terms</button>
-              <button type="button" onClick={() => setActivePolicyModal('refunds')} style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>Refunds</button>
-              <button type="button" onClick={() => setActivePolicyModal('pricing')} style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>Pricing</button>
+            <div onContextMenu={(e) => !isPaid && e.preventDefault()} style={{ overflowX: 'auto', border: '1px solid #cbd5e1', borderRadius: '4px', userSelect: isPaid ? 'text' : 'none' }}>
+              <table cellPadding="8" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', minWidth: '600px' }}>
+                <thead>
+                  <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', textAlign: 'left' }}>
+                    <th>Date</th><th>Day</th><th>Gate Intake</th><th>Seg. Wet</th><th>Seg. Dry</th><th>Mixed Waste</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleRows.map((r, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td>{r.date}</td><td>{r.dayName}</td>
+                      <td><strong>{formatVal(r.totalIntake)}</strong></td>
+                      <td>{formatVal(r.wetSeg)}</td>
+                      <td>{formatVal(r.drySeg)}</td>
+                      <td>{formatVal(r.unsegregatedMixed)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <p style={{ margin: 0 }}>© {new Date().getFullYear()} Consilience Research Foundation / SWM Suite. All Rights Reserved.</p>
-          </footer>
 
-          {/* POLICY MODAL */}
-          {activePolicyModal && (
-            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '16px' }}>
-              <div style={{ background: '#fff', padding: '24px', borderRadius: '8px', maxWidth: '600px', width: '100%', maxHeight: '80vh', overflowY: 'auto' }}>
-                {activePolicyModal === 'contact' && (
-                  <div>
-                    <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Contact Us</h2>
-                    <p style={{ fontSize: '13px' }}><strong>Organisation:</strong> Consilience Research Foundation</p>
-                    <p style={{ fontSize: '13px' }}><strong>Address:</strong> Arjunganj, Lucknow, Uttar Pradesh, India</p>
-                    <p style={{ fontSize: '13px' }}><strong>Email:</strong> support@consilience.res.in</p>
-                  </div>
-                )}
-                {activePolicyModal === 'terms' && (
-                  <div>
-                    <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Terms & Conditions</h2>
-                    <p style={{ fontSize: '12px' }}>This tool provides engineered multi-asset estimations for solid waste management facilities.</p>
-                  </div>
-                )}
-                {activePolicyModal === 'refunds' && (
-                  <div>
-                    <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Refunds & Cancellations</h2>
-                    <p style={{ fontSize: '12px' }}>Digital Excel files are unlocked instantly upon payment confirmation. Failed unlocks after debit are refunded in 5-7 business days.</p>
-                  </div>
-                )}
-                {activePolicyModal === 'pricing' && (
-                  <div>
-                    <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Services & Pricing (INR)</h2>
-                    <ul style={{ fontSize: '12px', lineHeight: '1.8' }}>
-                      <li>Integrated 3-in-1 Master Suite: ₹500 / Month (Includes Gate, Compost & MRF Tabs)</li>
-                    </ul>
-                  </div>
-                )}
-                <button type="button" onClick={() => setActivePolicyModal(null)} style={{ marginTop: '15px', padding: '8px 16px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '4px' }}>Close</button>
+            {!isPaid && (
+              <div style={{ border: '2px dashed #047857', background: '#ecfdf5', padding: '15px', textAlign: 'center', marginTop: '12px', borderRadius: '6px' }}>
+                <Lock style={{ color: '#047857' }} size={18} />
+                <h4 style={{ margin: '4px 0', color: '#065f46' }}>Preview Locked (Days 1–5 Only)</h4>
+                <button onClick={handlePayment} disabled={isProcessing} style={{ padding: '10px 20px', background: '#047857', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', marginTop: '8px' }}>
+                  {isProcessing ? 'Connecting...' : `Pay ₹${pricing.total} & Download File`}
+                </button>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* COMPLIANCE FOOTER */}
+        <footer style={{ marginTop: '40px', paddingTop: '20px', borderTop: '1px solid #cbd5e1', textAlign: 'center', fontSize: '12px', color: '#64748b' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginBottom: '10px' }}>
+            <button type="button" onClick={() => setActivePolicyModal('contact')} style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>Contact Us</button> |
+            <button type="button" onClick={() => setActivePolicyModal('terms')} style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>Terms & Conditions</button> |
+            <button type="button" onClick={() => setActivePolicyModal('refunds')} style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>Refunds & Cancellations</button> |
+            <button type="button" onClick={() => setActivePolicyModal('pricing')} style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>Services & Pricing (INR)</button>
+          </div>
+          <p style={{ margin: 0 }}>© {new Date().getFullYear()} Consilience Research Foundation / SWM Suite. All Rights Reserved.</p>
+        </footer>
+
+        {/* POLICY MODAL */}
+        {activePolicyModal && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '15px' }}>
+            <div style={{ background: '#fff', padding: '24px', borderRadius: '8px', maxWidth: '600px', width: '100%', maxHeight: '80vh', overflowY: 'auto' }}>
+              {activePolicyModal === 'contact' && (
+                <div>
+                  <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Contact Us</h2>
+                  <p style={{ fontSize: '13px' }}><strong>Organisation:</strong> Consilience Research Foundation</p>
+                  <p style={{ fontSize: '13px' }}><strong>Address:</strong> Arjunganj, Lucknow, Uttar Pradesh, India</p>
+                  <p style={{ fontSize: '13px' }}><strong>Email:</strong> support@consilience.res.in</p>
+                </div>
+              )}
+              {activePolicyModal === 'terms' && (
+                <div>
+                  <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Terms & Conditions</h2>
+                  <p style={{ fontSize: '12px' }}>This tool provides engineered multi-asset estimations for solid waste management facilities.</p>
+                </div>
+              )}
+              {activePolicyModal === 'refunds' && (
+                <div>
+                  <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Refunds & Cancellations</h2>
+                  <p style={{ fontSize: '12px' }}>Digital Excel files are unlocked instantly upon payment confirmation. Failed unlocks after debit are refunded in 5-7 business days.</p>
+                </div>
+              )}
+              {activePolicyModal === 'pricing' && (
+                <div>
+                  <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Services & Pricing (INR)</h2>
+                  <ul style={{ fontSize: '12px', lineHeight: '1.8' }}>
+                    <li>Integrated 3-in-1 Master Suite: ₹500 / Month (Includes Gate, Compost & MRF Tabs)</li>
+                  </ul>
+                </div>
+              )}
+              <button type="button" onClick={() => setActivePolicyModal(null)} style={{ marginTop: '15px', padding: '8px 16px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Close</button>
             </div>
-          )}
+          </div>
+        )}
 
       </div>
     </div>
+
+      </div>
+    </div>
+  );
+}
+
   );
 }
