@@ -1,0 +1,14 @@
+swm-integrated-suite/
+│
+├── api/
+│   └── create-order.js       (Vercel Backend API for Cashfree)
+│
+├── src/
+│   ├── App.jsx               (आपने इसे पहले ही कॉपी कर लिया है)
+│   ├── main.jsx              (React Entry Point)
+│   └── index.css             (Basic Styling)
+│
+├── .env                      (आपकी Secret Keys)
+├── index.html                (Main HTML File)
+├── package.json              (Dependencies)
+└── vite.config.js            (Vite Builder Config)
