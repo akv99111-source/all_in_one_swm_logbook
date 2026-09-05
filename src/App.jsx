@@ -100,7 +100,7 @@ export default function App() {
   
   const [generatedMonthlyData, setGeneratedMonthlyData] = useState(null);
   const [activeTabMonth, setActiveTabMonth] = useState(null);
-  const [activeAssetView, setActiveAssetView] = useState('gate'); // 'gate', 'mixed', or unit id
+  const [activeAssetView, setActiveAssetView] = useState('gate');
   const [isPaid, setIsPaid] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [activePolicyModal, setActivePolicyModal] = useState(null);
@@ -133,7 +133,7 @@ export default function App() {
     setMrfUnits(mrfUnits.map(u => u.id === id ? { ...u, [field]: value } : u));
   };
 
-  const getSessionKey = () => `crf_paid_INTEGRATED_${name.trim().toLowerCase().replace(/\s+/g, '_')}_${selectedMonths.length}M`;
+  const getSessionKey = () => `crf_paid_INTEGRATED_${name.trim().toLowerCase().replace(/\s+/g, '_')}_${selectedMonths.join('_')}_${startYear}`;
 
   useEffect(() => {
     const rawData = localStorage.getItem(getSessionKey());
@@ -148,7 +148,7 @@ export default function App() {
       }
     }
     setIsPaid(false);
-  }, [name, selectedMonths.length]);
+  }, [name, selectedMonths, startYear]);
 
   const toggleMonth = (mId) => {
     if (selectedMonths.includes(mId)) {
@@ -249,6 +249,16 @@ export default function App() {
       monthlyDataMap[m] = logs;
     });
 
+    const rawData = localStorage.getItem(getSessionKey());
+    let verifiedPaid = false;
+    if (rawData) {
+      try {
+        const parsed = JSON.parse(rawData);
+        if (parsed.paid && (Date.now() - parsed.timestamp < 12 * 60 * 60 * 1000)) verifiedPaid = true;
+      } catch (e) { if (rawData === 'true') verifiedPaid = true; }
+    }
+    setIsPaid(verifiedPaid);
+
     setGeneratedMonthlyData(monthlyDataMap);
     setActiveTabMonth(selectedMonths[0]);
     setActiveAssetView('gate');
@@ -308,12 +318,14 @@ export default function App() {
 
   const downloadExcel = () => {
     if (!generatedMonthlyData) return;
+    if (!isPaid) return alert('Please complete payment to download full dataset.');
+
     try {
       const u = displayUnit === 'kg' ? 'kg' : 'Tons';
       const wb = XLSX.utils.book_new();
 
       selectedMonths.forEach((mId) => {
-        const monthName = MONTHS.find(m => m.id === mId)?.fullEn || `Month_${mId}`;
+        const monthName = MONTHS.find(m => m.id === mId)?.shortEn || `M${mId}`;
 
         // 1. Gate Intake Sheet
         const gateHeaders = ["Date", "Day", `Total Gate Intake (${u})`, `Segregated Wet (${u})`, `Segregated Dry (${u})`, `Domestic Hazardous (${u})`, `Domestic Sanitary (${u})`, `Unsegregated Mixed (${u})`];
@@ -324,21 +336,23 @@ export default function App() {
         if (enableMixedPlant) {
           const preHeaders = ["Date", "Day", `Mixed Intake (${u})`, `Fine Screen Organics (${u})`, `Coarse Screen RDF (${u})`, `Heavy Inerts (${u})`];
           const preRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.unsegregatedMixed), formatVal(r.organicFines), formatVal(r.dryOversize), formatVal(r.heavyInerts)]);
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([preHeaders, ...preRows]), `${monthName}_MixedPlant`);
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([preHeaders, ...preRows]), `${monthName}_Mixed`);
         }
 
-        // 3. Compost Unit Sheets
-        compostUnits.forEach(unit => {
+        // 3. Compost Unit Sheets (Unique Name Indexing)
+        compostUnits.forEach((unit, idx) => {
           const cHeaders = ["Date", "Day", `Unit Feed (${u})`, `Compost Yield (${u})`];
           const cRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.compostUnitBreakdown[unit.id]?.feed), formatVal(r.compostUnitBreakdown[unit.id]?.compostYield)]);
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([cHeaders, ...cRows]), `${monthName}_${unit.label.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 10)}`);
+          const sheetName = `${monthName}_C${idx + 1}_${unit.label.replace(/[^a-zA-Z0-9]/g, '')}`.substring(0, 31);
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([cHeaders, ...cRows]), sheetName);
         });
 
-        // 4. MRF Shed Sheets
-        mrfUnits.forEach(unit => {
+        // 4. MRF Shed Sheets (Unique Name Indexing)
+        mrfUnits.forEach((unit, idx) => {
           const mHeaders = ["Date", "Day", `Unit Feed (${u})`, `Sorted Recyclables (${u})`, `RDF Dispatched (${u})`];
           const mRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.mrfUnitBreakdown[unit.id]?.feed), formatVal(r.mrfUnitBreakdown[unit.id]?.recyclables), formatVal(r.mrfUnitBreakdown[unit.id]?.rdf)]);
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([mHeaders, ...mRows]), `${monthName}_${unit.label.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 10)}`);
+          const sheetName = `${monthName}_M${idx + 1}_${unit.label.replace(/[^a-zA-Z0-9]/g, '')}`.substring(0, 31);
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([mHeaders, ...mRows]), sheetName);
         });
       });
 
@@ -472,6 +486,15 @@ export default function App() {
                 <Plus size={14} /> Add Compost Unit
               </button>
             </div>
+
+            {/* COLUMN HEADERS */}
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr auto', gap: '8px', marginBottom: '4px', fontSize: '11px', fontWeight: 'bold', color: '#166534', paddingRight: '20px' }}>
+              <span>Asset Name</span>
+              <span>Type</span>
+              <span>Capacity (TPD)</span>
+              <span></span>
+            </div>
+
             {compostUnits.map((u) => (
               <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr auto', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
                 <input type="text" value={u.label} onChange={(e) => updateCompostUnit(u.id, 'label', e.target.value)} style={{ ...inputStyle, marginTop: 0 }} />
@@ -493,6 +516,15 @@ export default function App() {
                 <Plus size={14} /> Add MRF Shed
               </button>
             </div>
+
+            {/* COLUMN HEADERS */}
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr auto', gap: '8px', marginBottom: '4px', fontSize: '11px', fontWeight: 'bold', color: '#0369a1', paddingRight: '20px' }}>
+              <span>Asset Name</span>
+              <span>Type</span>
+              <span>Capacity (TPD)</span>
+              <span></span>
+            </div>
+
             {mrfUnits.map((u) => (
               <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr auto', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
                 <input type="text" value={u.label} onChange={(e) => updateMrfUnit(u.id, 'label', e.target.value)} style={{ ...inputStyle, marginTop: 0 }} />
@@ -563,10 +595,12 @@ export default function App() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <strong>{name} — Sheet Preview</strong>
-              {isPaid && (
+              {isPaid ? (
                 <button onClick={downloadExcel} style={{ padding: '6px 12px', background: '#047857', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <FileSpreadsheet size={14} /> Download Excel Workbook
                 </button>
+              ) : (
+                <span style={{ fontSize: '12px', color: '#dc2626', fontWeight: 'bold' }}>🔒 Locked Preview (Days 1–5 Only)</span>
               )}
             </div>
 
