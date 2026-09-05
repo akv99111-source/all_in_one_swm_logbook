@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Building2, Download, Lock, Globe, ShieldCheck, Plus, Trash2, BookOpen, Layers, ArrowLeft } from 'lucide-react';
+import { Building2, Download, Lock, Globe, ShieldCheck, Plus, Trash2, Layers, ArrowLeft, Settings2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const MONTHS = [
@@ -79,14 +79,20 @@ export default function App() {
   const [ulbCalculationMode, setUlbCalculationMode] = useState('population');
   const [population, setPopulation] = useState(50000);
   const [perCapitaOption, setPerCapitaOption] = useState('450');
-  const [actualAverageTpd, setActualAverageTpd] = useState(10);
+  const [actualAverageTpd, setActualAverageTpd] = useState(20);
   const [segregationRate, setSegregationRate] = useState(80);
 
+  // Mixed Waste Processing Plant Toggle
+  const [enableMixedPlant, setEnableMixedPlant] = useState(true);
+  const [mixedPlantCapacity, setMixedPlantCapacity] = useState(10);
+
   const [compostUnits, setCompostUnits] = useState([
-    { id: 'c1', label: 'Windrow Pad Alpha', type: 'Windrow Pad', capacity: 10 }
+    { id: 'c1', label: 'Windrow Pad 1', type: 'Windrow Pad', capacity: 5 },
+    { id: 'c2', label: 'Windrow Pad 2', type: 'Windrow Pad', capacity: 5 }
   ]);
   const [mrfUnits, setMrfUnits] = useState([
-    { id: 'm1', label: 'MRF Shed 2', type: 'Manual Sorting Shed', capacity: 5 }
+    { id: 'm1', label: 'MRF Shed 1', type: 'Manual Sorting Shed', capacity: 5 },
+    { id: 'm2', label: 'MRF Shed 2', type: 'Manual Sorting Shed', capacity: 5 }
   ]);
   
   const [startYear, setStartYear] = useState(2026);
@@ -101,6 +107,7 @@ export default function App() {
 
   const resultsRef = useRef(null);
   const parsedPerCapita = Number(perCapitaOption);
+  const calculatedTpdDisplay = ((Number(population) * parsedPerCapita) / 1000000).toFixed(2);
 
   const addCompostUnit = () => {
     setCompostUnits([...compostUnits, { id: `c${Date.now()}`, label: lang === 'hi' ? 'नई कम्पोस्ट यूनिट' : 'New Compost Unit', type: 'Windrow Pad', capacity: 5 }]);
@@ -173,7 +180,7 @@ export default function App() {
         ? (Number(population) * parsedPerCapita) / 1000000 
         : Number(actualAverageTpd);
 
-      const seedString = `INTEGRATED-3IN1-${selectedState}-${name}-${startYear}-${m}-${ulbCalculationMode}-${targetTons}-${segregationRate}`;
+      const seedString = `INTEGRATED-FULL-${selectedState}-${name}-${startYear}-${m}-${ulbCalculationMode}-${targetTons}-${segregationRate}-${enableMixedPlant}`;
       const random = mulberry32(cyrb128(seedString));
       let logs = [];
 
@@ -195,9 +202,17 @@ export default function App() {
         const hazSeg = Number((segregatedTotal * 0.03).toFixed(3));
         const sanSeg = Number((segregatedTotal * 0.05).toFixed(3));
 
-        const organicFines = Number((unsegregatedMixed * 0.45).toFixed(3));
-        const dryOversize = Number((unsegregatedMixed * 0.35).toFixed(3));
-        const heavyInerts = Number((unsegregatedMixed * 0.20).toFixed(3));
+        let organicFines = 0;
+        let dryOversize = 0;
+        let heavyInerts = 0;
+
+        if (enableMixedPlant) {
+          organicFines = Number((unsegregatedMixed * 0.45).toFixed(3));
+          dryOversize = Number((unsegregatedMixed * 0.35).toFixed(3));
+          heavyInerts = Number((unsegregatedMixed * 0.20).toFixed(3));
+        } else {
+          heavyInerts = unsegregatedMixed; // Unprocessed landfill bound
+        }
 
         const totalCompostFeed = wetSeg + organicFines;
         const totalCompostCapacity = compostUnits.reduce((acc, u) => acc + Number(u.capacity || 1), 0);
@@ -298,20 +313,26 @@ export default function App() {
     selectedMonths.forEach((mId) => {
       const monthName = MONTHS.find(m => m.id === mId)?.fullEn;
 
+      // 1. Gate Intake Sheet
       const gateHeaders = ["Date", "Day", `Total Gate Intake (${u})`, `Segregated Wet (${u})`, `Segregated Dry (${u})`, `Domestic Hazardous (${u})`, `Domestic Sanitary (${u})`, `Unsegregated Mixed (${u})`];
       const gateRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.totalIntake), formatVal(r.wetSeg), formatVal(r.drySeg), formatVal(r.hazSeg), formatVal(r.sanSeg), formatVal(r.unsegregatedMixed)]);
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([gateHeaders, ...gateRows]), `${monthName}_Gate`);
 
-      const preHeaders = ["Date", "Day", `Mixed Intake (${u})`, `Fine Screen Fraction (${u})`, `Coarse Screen Fraction (${u})`, `Heavy Inerts (${u})`];
-      const preRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.unsegregatedMixed), formatVal(r.organicFines), formatVal(r.dryOversize), formatVal(r.heavyInerts)]);
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([preHeaders, ...preRows]), `${monthName}_PreSort`);
+      // 2. Mixed Waste Plant Sheet (If Enabled)
+      if (enableMixedPlant) {
+        const preHeaders = ["Date", "Day", `Mixed Intake (${u})`, `Fine Screen Organics (${u})`, `Coarse Screen RDF (${u})`, `Heavy Inerts (${u})`];
+        const preRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.unsegregatedMixed), formatVal(r.organicFines), formatVal(r.dryOversize), formatVal(r.heavyInerts)]);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([preHeaders, ...preRows]), `${monthName}_MixedPlant`);
+      }
 
+      // 3. Compost Unit Sheets
       compostUnits.forEach(unit => {
         const cHeaders = ["Date", "Day", `Unit Feed (${u})`, `Compost Yield (${u})`];
         const cRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.compostUnitBreakdown[unit.id]?.feed), formatVal(r.compostUnitBreakdown[unit.id]?.compostYield)]);
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([cHeaders, ...cRows]), `${monthName}_${unit.label.substring(0, 10)}`);
       });
 
+      // 4. MRF Shed Sheets
       mrfUnits.forEach(unit => {
         const mHeaders = ["Date", "Day", `Unit Feed (${u})`, `Sorted Recyclables (${u})`, `RDF Dispatched (${u})`];
         const mRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.mrfUnitBreakdown[unit.id]?.feed), formatVal(r.mrfUnitBreakdown[unit.id]?.recyclables), formatVal(r.mrfUnitBreakdown[unit.id]?.rdf)]);
@@ -319,7 +340,7 @@ export default function App() {
       });
     });
 
-    XLSX.writeFile(wb, `Integrated_Suite_${name.replace(/\s+/g, '_')}.xlsx`);
+    XLSX.writeFile(wb, `Integrated_Master_Suite_${name.replace(/\s+/g, '_')}.xlsx`);
   };
 
   const activeRows = generatedMonthlyData?.[activeTabMonth] || [];
@@ -334,11 +355,11 @@ export default function App() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
             <div>
               <span style={{ background: 'rgba(255,255,255,0.2)', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <ShieldCheck size={12} /> {lang === 'hi' ? 'MULTI-ASSET SWM ESTIMATION ENGINE' : 'MULTI-ASSET SWM ESTIMATION ENGINE'}
+                <ShieldCheck size={12} /> MULTI-ASSET SWM ESTIMATION ENGINE
               </span>
               <h1 style={{ fontSize: '22px', margin: '6px 0 2px 0', fontWeight: '800' }}>
                 <Building2 size={22} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-                {lang === 'hi' ? 'Integrated 3-in-1 Multi-Unit Logbook Suite' : 'Integrated 3-in-1 Multi-Unit Logbook Suite'}
+                {lang === 'hi' ? 'एकीकृत 3-इन-1 मास्टर लॉग-बुक सुइट' : 'Integrated 3-in-1 Master Logbook Suite'}
               </h1>
             </div>
             <button type="button" onClick={() => setLang(lang === 'hi' ? 'en' : 'hi')} style={{ padding: '6px 12px', background: '#fff', color: '#047857', border: 'none', borderRadius: '5px', fontWeight: 'bold', cursor: 'pointer' }}>
@@ -347,7 +368,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* CROSS-LINK BANNER TO STANDALONE APP */}
+        {/* CROSS-LINK BANNER */}
         <div style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
           <div>
             <h3 style={{ margin: 0, color: '#334155', fontSize: '14px' }}>{lang === 'hi' ? 'सिंगल-फैसिलिटी लॉग-बुक चाहिए?' : 'Need Single-Facility Logbooks?'}</h3>
@@ -363,32 +384,78 @@ export default function App() {
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '14px' }}>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: '600' }}>{lang === 'hi' ? 'Select State' : 'Select State'}</label>
+              <label style={{ fontSize: '12px', fontWeight: '600' }}>Select State</label>
               <select style={inputStyle} value={selectedState} onChange={(e) => setSelectedState(e.target.value)}>
                 {STATES_LIST.map((s) => <option key={s.nameEn} value={s.nameEn}>{lang === 'hi' ? s.nameHi : s.nameEn}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: '600' }}>{lang === 'hi' ? 'ULB / Facility Name' : 'ULB / Facility Name'}</label>
+              <label style={{ fontSize: '12px', fontWeight: '600' }}>ULB / Facility Name</label>
               <input style={inputStyle} type="text" required value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: '600' }}>{lang === 'hi' ? 'Mobile Number' : 'Mobile Number'}</label>
-              <input style={inputStyle} type="tel" maxLength={10} placeholder="" required value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))} />
+              <label style={{ fontSize: '12px', fontWeight: '600' }}>Mobile Number</label>
+              <input style={inputStyle} type="tel" maxLength={10} required value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))} />
             </div>
           </div>
 
           <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '14px' }}>
-            <strong style={{ fontSize: '13px', display: 'block', marginBottom: '10px' }}>Gate Intake & Segregation Efficiency</strong>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', alignItems: 'center' }}>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '600' }}>Population (Approx.)</label>
-                <input style={inputStyle} type="number" value={population} onChange={(e) => setPopulation(e.target.value)} />
-              </div>
+            <strong style={{ fontSize: '13px', display: 'block', marginBottom: '10px' }}>Waste Estimation Basis & Segregation Rate</strong>
+            
+            <div style={{ display: 'flex', gap: '15px', marginBottom: '10px', fontSize: '13px' }}>
+              <label style={{ cursor: 'pointer' }}><input type="radio" checked={ulbCalculationMode === 'population'} onChange={() => setUlbCalculationMode('population')} /> {lang === 'hi' ? 'जनसंख्या आधारित' : 'Population Based'}</label>
+              <label style={{ cursor: 'pointer' }}><input type="radio" checked={ulbCalculationMode === 'actual'} onChange={() => setUlbCalculationMode('actual')} /> {lang === 'hi' ? 'वास्तविक TPD' : 'Actual TPD'}</label>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', alignItems: 'center' }}>
+              {ulbCalculationMode === 'population' ? (
+                <>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: '600' }}>Population (Approx.)</label>
+                    <input style={inputStyle} type="number" value={population} onChange={(e) => setPopulation(e.target.value)} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: '600' }}>Per Capita Rate</label>
+                    <select style={inputStyle} value={perCapitaOption} onChange={(e) => setPerCapitaOption(e.target.value)}>
+                      <option value="300">300 g/day</option>
+                      <option value="450">450 g/day</option>
+                      <option value="500">500 g/day</option>
+                    </select>
+                  </div>
+                  <div style={{ background: '#ecfdf5', padding: '8px 12px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
+                    <span style={{ fontSize: '11px', color: '#065f46', fontWeight: 'bold', display: 'block' }}>Calculated Gate Waste</span>
+                    <span style={{ fontSize: '16px', color: '#047857', fontWeight: '900' }}>{calculatedTpdDisplay} TPD</span>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: '600' }}>Actual Waste Generation (TPD)</label>
+                  <input style={inputStyle} type="number" value={actualAverageTpd} onChange={(e) => setActualAverageTpd(e.target.value)} />
+                </div>
+              )}
+
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#0f172a' }}>Source Segregation Rate: {segregationRate}%</label>
-                <input type="range" min="20" max="95" step="5" value={segregationRate} onChange={(e) => setSegregationRate(Number(e.target.value))} style={{ width: '100%', marginTop: '8px' }} />
+                <input type="range" min="20" max="95" step="5" value={segregationRate} onChange={(e) => setSegregationRate(Number(e.target.value))} style={{ width: '100%', marginTop: '6px' }} />
               </div>
+            </div>
+          </div>
+
+          {/* MIXED WASTE PROCESSING PLANT TOGGLE */}
+          <div style={{ background: '#fffbeb', padding: '12px', borderRadius: '6px', border: '1px solid #fde68a', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', color: '#92400e' }}>
+                <input type="checkbox" checked={enableMixedPlant} onChange={(e) => setEnableMixedPlant(e.target.checked)} />
+                <Settings2 size={16} /> Include Mixed Waste Processing Plant (Trommel / Pre-Sorting)
+              </label>
+
+              {enableMixedPlant && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '12px', color: '#78350f', fontWeight: '600' }}>Trommel Capacity:</span>
+                  <input type="number" value={mixedPlantCapacity} onChange={(e) => setMixedPlantCapacity(e.target.value)} style={{ width: '70px', padding: '4px', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+                  <span style={{ fontSize: '12px', color: '#78350f' }}>TPD</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -407,7 +474,7 @@ export default function App() {
                   <option value="Windrow Pad">Windrow Pad</option>
                   <option value="Vermicompost Pit">Vermicompost Pit</option>
                 </select>
-                <input type="number" value={u.capacity} onChange={(e) => updateCompostUnit(u.id, 'capacity', e.target.value)} style={{ ...inputStyle, marginTop: 0 }} />
+                <input type="number" value={u.capacity} onChange={(e) => updateCompostUnit(u.id, 'capacity', e.target.value)} style={{ ...inputStyle, marginTop: 0 }} placeholder="TPD" />
                 {compostUnits.length > 1 && <button type="button" onClick={() => removeCompostUnit(u.id)} style={{ color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={16} /></button>}
               </div>
             ))}
@@ -428,14 +495,26 @@ export default function App() {
                   <option value="Manual Sorting Shed">Manual Sorting Shed</option>
                   <option value="Semi-Automated Line">Semi-Automated Line</option>
                 </select>
-                <input type="number" value={u.capacity} onChange={(e) => updateMrfUnit(u.id, 'capacity', e.target.value)} style={{ ...inputStyle, marginTop: 0 }} />
+                <input type="number" value={u.capacity} onChange={(e) => updateMrfUnit(u.id, 'capacity', e.target.value)} style={{ ...inputStyle, marginTop: 0 }} placeholder="TPD" />
                 {mrfUnits.length > 1 && <button type="button" onClick={() => removeMrfUnit(u.id)} style={{ color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={16} /></button>}
               </div>
             ))}
           </div>
 
+          {/* MONTH SELECTOR GRID */}
+          <div style={{ marginBottom: '14px' }}>
+            <strong style={{ fontSize: '13px' }}>{lang === 'hi' ? `महीने चुनें (${pricing.count} चयनित — ₹${pricing.total}):` : `Select Months (${pricing.count} Selected — ₹${pricing.total}):`}</strong>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(75px, 1fr))', gap: '6px', marginTop: '6px' }}>
+              {MONTHS.map((m) => (
+                <button key={m.id} type="button" onClick={() => toggleMonth(m.id)} style={{ padding: '6px 2px', borderRadius: '4px', border: selectedMonths.includes(m.id) ? '2px solid #047857' : '1px solid #cbd5e1', background: selectedMonths.includes(m.id) ? '#ecfdf5' : '#fff', fontWeight: selectedMonths.includes(m.id) ? 'bold' : 'normal', cursor: 'pointer', fontSize: '12px' }}>
+                  {lang === 'hi' ? m.shortHi : m.shortEn}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <button type="submit" style={{ width: '100%', padding: '14px', background: '#047857', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px' }}>
-            Generate Master Dataset (₹500/mo Suite) →
+            Generate Master Dataset (₹{pricing.total}) →
           </button>
         </form>
 
@@ -523,7 +602,7 @@ export default function App() {
                 <div>
                   <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Services & Pricing (INR)</h2>
                   <ul style={{ fontSize: '12px', lineHeight: '1.8' }}>
-                    <li>Integrated 3-in-1 Master Suite: ₹500 / Month (Includes Gate, Compost & MRF Tabs)</li>
+                    <li>Integrated 3-in-1 Master Suite: ₹500 / Month (Includes Gate, Compost, MRF & Pre-Sorting Plant Tabs)</li>
                   </ul>
                 </div>
               )}
