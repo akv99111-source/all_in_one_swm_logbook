@@ -1,14 +1,21 @@
-swm-integrated-suite/
-│
-├── api/
-│   └── create-order.js       (Vercel Backend API for Cashfree)
-│
-├── src/
-│   ├── App.jsx               (आपने इसे पहले ही कॉपी कर लिया है)
-│   ├── main.jsx              (React Entry Point)
-│   └── index.css             (Basic Styling)
-│
-├── .env                      (आपकी Secret Keys)
-├── index.html                (Main HTML File)
-├── package.json              (Dependencies)
-└── vite.config.js            (Vite Builder Config)
+{
+  "name": "swm-integrated-suite",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "lucide-react": "^0.300.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^5.0.0"
+  }
+}
