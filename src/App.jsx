@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Building2, Download, Lock, Globe, ShieldCheck, Plus, Trash2, Layers, ArrowLeft, Settings2 } from 'lucide-react';
+import { Building2, Download, Lock, Globe, ShieldCheck, Plus, Trash2, Layers, ArrowLeft, Settings2, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const MONTHS = [
@@ -82,7 +82,6 @@ export default function App() {
   const [actualAverageTpd, setActualAverageTpd] = useState(20);
   const [segregationRate, setSegregationRate] = useState(80);
 
-  // Mixed Waste Processing Plant Toggle
   const [enableMixedPlant, setEnableMixedPlant] = useState(true);
   const [mixedPlantCapacity, setMixedPlantCapacity] = useState(10);
 
@@ -101,6 +100,7 @@ export default function App() {
   
   const [generatedMonthlyData, setGeneratedMonthlyData] = useState(null);
   const [activeTabMonth, setActiveTabMonth] = useState(null);
+  const [activeAssetView, setActiveAssetView] = useState('gate'); // 'gate', 'mixed', or unit id
   const [isPaid, setIsPaid] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [activePolicyModal, setActivePolicyModal] = useState(null);
@@ -110,7 +110,7 @@ export default function App() {
   const calculatedTpdDisplay = ((Number(population) * parsedPerCapita) / 1000000).toFixed(2);
 
   const addCompostUnit = () => {
-    setCompostUnits([...compostUnits, { id: `c${Date.now()}`, label: lang === 'hi' ? 'नई कम्पोस्ट यूनिट' : 'New Compost Unit', type: 'Windrow Pad', capacity: 5 }]);
+    setCompostUnits([...compostUnits, { id: `c_${Date.now()}`, label: `Windrow Pad ${compostUnits.length + 1}`, type: 'Windrow Pad', capacity: 5 }]);
   };
 
   const removeCompostUnit = (id) => {
@@ -122,7 +122,7 @@ export default function App() {
   };
 
   const addMrfUnit = () => {
-    setMrfUnits([...mrfUnits, { id: `m${Date.now()}`, label: lang === 'hi' ? 'नया एमआरएफ शेड' : 'New MRF Shed', type: 'Manual Sorting Shed', capacity: 5 }]);
+    setMrfUnits([...mrfUnits, { id: `m_${Date.now()}`, label: `MRF Shed ${mrfUnits.length + 1}`, type: 'Manual Sorting Shed', capacity: 5 }]);
   };
 
   const removeMrfUnit = (id) => {
@@ -211,7 +211,7 @@ export default function App() {
           dryOversize = Number((unsegregatedMixed * 0.35).toFixed(3));
           heavyInerts = Number((unsegregatedMixed * 0.20).toFixed(3));
         } else {
-          heavyInerts = unsegregatedMixed; // Unprocessed landfill bound
+          heavyInerts = unsegregatedMixed;
         }
 
         const totalCompostFeed = wetSeg + organicFines;
@@ -251,6 +251,7 @@ export default function App() {
 
     setGeneratedMonthlyData(monthlyDataMap);
     setActiveTabMonth(selectedMonths[0]);
+    setActiveAssetView('gate');
     setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   };
 
@@ -303,44 +304,48 @@ export default function App() {
     }
   };
 
-  const formatVal = (v) => displayUnit === 'kg' ? Math.round(v * 1000) : Number(v || 0).toFixed(3);
+  const formatVal = (v) => displayUnit === 'kg' ? Math.round(Number(v || 0) * 1000) : Number(v || 0).toFixed(3);
 
   const downloadExcel = () => {
     if (!generatedMonthlyData) return;
-    const u = displayUnit === 'kg' ? 'kg' : 'Tons';
-    const wb = XLSX.utils.book_new();
+    try {
+      const u = displayUnit === 'kg' ? 'kg' : 'Tons';
+      const wb = XLSX.utils.book_new();
 
-    selectedMonths.forEach((mId) => {
-      const monthName = MONTHS.find(m => m.id === mId)?.fullEn;
+      selectedMonths.forEach((mId) => {
+        const monthName = MONTHS.find(m => m.id === mId)?.fullEn || `Month_${mId}`;
 
-      // 1. Gate Intake Sheet
-      const gateHeaders = ["Date", "Day", `Total Gate Intake (${u})`, `Segregated Wet (${u})`, `Segregated Dry (${u})`, `Domestic Hazardous (${u})`, `Domestic Sanitary (${u})`, `Unsegregated Mixed (${u})`];
-      const gateRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.totalIntake), formatVal(r.wetSeg), formatVal(r.drySeg), formatVal(r.hazSeg), formatVal(r.sanSeg), formatVal(r.unsegregatedMixed)]);
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([gateHeaders, ...gateRows]), `${monthName}_Gate`);
+        // 1. Gate Intake Sheet
+        const gateHeaders = ["Date", "Day", `Total Gate Intake (${u})`, `Segregated Wet (${u})`, `Segregated Dry (${u})`, `Domestic Hazardous (${u})`, `Domestic Sanitary (${u})`, `Unsegregated Mixed (${u})`];
+        const gateRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.totalIntake), formatVal(r.wetSeg), formatVal(r.drySeg), formatVal(r.hazSeg), formatVal(r.sanSeg), formatVal(r.unsegregatedMixed)]);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([gateHeaders, ...gateRows]), `${monthName}_Gate`);
 
-      // 2. Mixed Waste Plant Sheet (If Enabled)
-      if (enableMixedPlant) {
-        const preHeaders = ["Date", "Day", `Mixed Intake (${u})`, `Fine Screen Organics (${u})`, `Coarse Screen RDF (${u})`, `Heavy Inerts (${u})`];
-        const preRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.unsegregatedMixed), formatVal(r.organicFines), formatVal(r.dryOversize), formatVal(r.heavyInerts)]);
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([preHeaders, ...preRows]), `${monthName}_MixedPlant`);
-      }
+        // 2. Mixed Waste Plant Sheet
+        if (enableMixedPlant) {
+          const preHeaders = ["Date", "Day", `Mixed Intake (${u})`, `Fine Screen Organics (${u})`, `Coarse Screen RDF (${u})`, `Heavy Inerts (${u})`];
+          const preRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.unsegregatedMixed), formatVal(r.organicFines), formatVal(r.dryOversize), formatVal(r.heavyInerts)]);
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([preHeaders, ...preRows]), `${monthName}_MixedPlant`);
+        }
 
-      // 3. Compost Unit Sheets
-      compostUnits.forEach(unit => {
-        const cHeaders = ["Date", "Day", `Unit Feed (${u})`, `Compost Yield (${u})`];
-        const cRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.compostUnitBreakdown[unit.id]?.feed), formatVal(r.compostUnitBreakdown[unit.id]?.compostYield)]);
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([cHeaders, ...cRows]), `${monthName}_${unit.label.substring(0, 10)}`);
+        // 3. Compost Unit Sheets
+        compostUnits.forEach(unit => {
+          const cHeaders = ["Date", "Day", `Unit Feed (${u})`, `Compost Yield (${u})`];
+          const cRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.compostUnitBreakdown[unit.id]?.feed), formatVal(r.compostUnitBreakdown[unit.id]?.compostYield)]);
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([cHeaders, ...cRows]), `${monthName}_${unit.label.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 10)}`);
+        });
+
+        // 4. MRF Shed Sheets
+        mrfUnits.forEach(unit => {
+          const mHeaders = ["Date", "Day", `Unit Feed (${u})`, `Sorted Recyclables (${u})`, `RDF Dispatched (${u})`];
+          const mRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.mrfUnitBreakdown[unit.id]?.feed), formatVal(r.mrfUnitBreakdown[unit.id]?.recyclables), formatVal(r.mrfUnitBreakdown[unit.id]?.rdf)]);
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([mHeaders, ...mRows]), `${monthName}_${unit.label.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 10)}`);
+        });
       });
 
-      // 4. MRF Shed Sheets
-      mrfUnits.forEach(unit => {
-        const mHeaders = ["Date", "Day", `Unit Feed (${u})`, `Sorted Recyclables (${u})`, `RDF Dispatched (${u})`];
-        const mRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.mrfUnitBreakdown[unit.id]?.feed), formatVal(r.mrfUnitBreakdown[unit.id]?.recyclables), formatVal(r.mrfUnitBreakdown[unit.id]?.rdf)]);
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([mHeaders, ...mRows]), `${monthName}_${unit.label.substring(0, 10)}`);
-      });
-    });
-
-    XLSX.writeFile(wb, `Integrated_Master_Suite_${name.replace(/\s+/g, '_')}.xlsx`);
+      XLSX.writeFile(wb, `Integrated_Master_Suite_${name.replace(/\s+/g, '_')}.xlsx`);
+    } catch (err) {
+      alert('Excel Generation Error: ' + err.message);
+    }
   };
 
   const activeRows = generatedMonthlyData?.[activeTabMonth] || [];
@@ -518,33 +523,102 @@ export default function App() {
           </button>
         </form>
 
-        {/* PREVIEW */}
+        {/* PREVIEW CONTAINER WITH ASSET TABS */}
         {generatedMonthlyData && (
           <div ref={resultsRef} style={{ background: '#fff', padding: '15px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+            
+            {/* MONTH TABS */}
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', overflowX: 'auto', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px' }}>
+              {selectedMonths.map(mId => (
+                <button key={mId} type="button" onClick={() => setActiveTabMonth(mId)} style={{ padding: '6px 12px', borderRadius: '4px', border: activeTabMonth === mId ? '2px solid #047857' : '1px solid #cbd5e1', background: activeTabMonth === mId ? '#047857' : '#f8fafc', color: activeTabMonth === mId ? '#fff' : '#334155', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>
+                  {MONTHS.find(m => m.id === mId)?.fullEn}
+                </button>
+              ))}
+            </div>
+
+            {/* ASSET SELECTOR SWITCHER */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', background: '#f1f5f9', padding: '8px', borderRadius: '6px' }}>
+              <button type="button" onClick={() => setActiveAssetView('gate')} style={{ padding: '6px 10px', borderRadius: '4px', border: 'none', background: activeAssetView === 'gate' ? '#0f172a' : 'transparent', color: activeAssetView === 'gate' ? '#fff' : '#475569', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>
+                🏢 Gate Intake Sheet
+              </button>
+
+              {enableMixedPlant && (
+                <button type="button" onClick={() => setActiveAssetView('mixed')} style={{ padding: '6px 10px', borderRadius: '4px', border: 'none', background: activeAssetView === 'mixed' ? '#0f172a' : 'transparent', color: activeAssetView === 'mixed' ? '#fff' : '#475569', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>
+                  ⚙️ Pre-Sorting Plant
+                </button>
+              )}
+
+              {compostUnits.map(u => (
+                <button key={u.id} type="button" onClick={() => setActiveAssetView(u.id)} style={{ padding: '6px 10px', borderRadius: '4px', border: 'none', background: activeAssetView === u.id ? '#166534' : 'transparent', color: activeAssetView === u.id ? '#fff' : '#15803d', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>
+                  🌱 {u.label}
+                </button>
+              ))}
+
+              {mrfUnits.map(u => (
+                <button key={u.id} type="button" onClick={() => setActiveAssetView(u.id)} style={{ padding: '6px 10px', borderRadius: '4px', border: 'none', background: activeAssetView === u.id ? '#0369a1' : 'transparent', color: activeAssetView === u.id ? '#fff' : '#0284c7', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>
+                  📦 {u.label}
+                </button>
+              ))}
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <strong>{name} — Gate Dataset Preview</strong>
+              <strong>{name} — Sheet Preview</strong>
               {isPaid && (
-                <button onClick={downloadExcel} style={{ padding: '6px 12px', background: '#047857', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
-                  <Download size={13} /> Export Master Excel
+                <button onClick={downloadExcel} style={{ padding: '6px 12px', background: '#047857', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <FileSpreadsheet size={14} /> Download Excel Workbook
                 </button>
               )}
             </div>
 
+            {/* PREVIEW TABLE */}
             <div onContextMenu={(e) => !isPaid && e.preventDefault()} style={{ overflowX: 'auto', border: '1px solid #cbd5e1', borderRadius: '4px', userSelect: isPaid ? 'text' : 'none' }}>
               <table cellPadding="8" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', minWidth: '600px' }}>
                 <thead>
                   <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', textAlign: 'left' }}>
-                    <th>Date</th><th>Day</th><th>Gate Intake</th><th>Seg. Wet</th><th>Seg. Dry</th><th>Mixed Waste</th>
+                    <th>Date</th><th>Day</th>
+                    {activeAssetView === 'gate' && <><th style={{ textAlign: 'right' }}>Gate Intake</th><th style={{ textAlign: 'right' }}>Seg. Wet</th><th style={{ textAlign: 'right' }}>Seg. Dry</th><th style={{ textAlign: 'right' }}>Mixed Waste</th></>}
+                    {activeAssetView === 'mixed' && <><th style={{ textAlign: 'right' }}>Mixed Intake</th><th style={{ textAlign: 'right' }}>Fine Organics</th><th style={{ textAlign: 'right' }}>Coarse RDF</th><th style={{ textAlign: 'right' }}>Inerts</th></>}
+                    {compostUnits.some(u => u.id === activeAssetView) && <><th style={{ textAlign: 'right' }}>Feed (Tons)</th><th style={{ textAlign: 'right' }}>Compost Yield (Tons)</th></>}
+                    {mrfUnits.some(u => u.id === activeAssetView) && <><th style={{ textAlign: 'right' }}>Feed (Tons)</th><th style={{ textAlign: 'right' }}>Recyclables</th><th style={{ textAlign: 'right' }}>RDF Dispatched</th></>}
                   </tr>
                 </thead>
                 <tbody>
                   {visibleRows.map((r, idx) => (
                     <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
                       <td>{r.date}</td><td>{r.dayName}</td>
-                      <td><strong>{formatVal(r.totalIntake)}</strong></td>
-                      <td>{formatVal(r.wetSeg)}</td>
-                      <td>{formatVal(r.drySeg)}</td>
-                      <td>{formatVal(r.unsegregatedMixed)}</td>
+
+                      {activeAssetView === 'gate' && (
+                        <>
+                          <td style={{ textAlign: 'right' }}><strong>{formatVal(r.totalIntake)}</strong></td>
+                          <td style={{ textAlign: 'right' }}>{formatVal(r.wetSeg)}</td>
+                          <td style={{ textAlign: 'right' }}>{formatVal(r.drySeg)}</td>
+                          <td style={{ textAlign: 'right' }}>{formatVal(r.unsegregatedMixed)}</td>
+                        </>
+                      )}
+
+                      {activeAssetView === 'mixed' && (
+                        <>
+                          <td style={{ textAlign: 'right' }}><strong>{formatVal(r.unsegregatedMixed)}</strong></td>
+                          <td style={{ textAlign: 'right' }}>{formatVal(r.organicFines)}</td>
+                          <td style={{ textAlign: 'right' }}>{formatVal(r.dryOversize)}</td>
+                          <td style={{ textAlign: 'right' }}>{formatVal(r.heavyInerts)}</td>
+                        </>
+                      )}
+
+                      {compostUnits.some(u => u.id === activeAssetView) && (
+                        <>
+                          <td style={{ textAlign: 'right' }}><strong>{formatVal(r.compostUnitBreakdown[activeAssetView]?.feed)}</strong></td>
+                          <td style={{ textAlign: 'right' }}>{formatVal(r.compostUnitBreakdown[activeAssetView]?.compostYield)}</td>
+                        </>
+                      )}
+
+                      {mrfUnits.some(u => u.id === activeAssetView) && (
+                        <>
+                          <td style={{ textAlign: 'right' }}><strong>{formatVal(r.mrfUnitBreakdown[activeAssetView]?.feed)}</strong></td>
+                          <td style={{ textAlign: 'right' }}>{formatVal(r.mrfUnitBreakdown[activeAssetView]?.recyclables)}</td>
+                          <td style={{ textAlign: 'right' }}>{formatVal(r.mrfUnitBreakdown[activeAssetView]?.rdf)}</td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>
