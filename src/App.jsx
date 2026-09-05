@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Building2, Download, Lock, Globe, ShieldCheck, Plus, Trash2, BookOpen, Layers } from 'lucide-react';
+import { Building2, Download, Lock, Globe, ShieldCheck, Plus, Trash2, BookOpen, Layers, ArrowLeft } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const MONTHS = [
@@ -101,7 +101,6 @@ export default function App() {
 
   const resultsRef = useRef(null);
   const parsedPerCapita = Number(perCapitaOption);
-  const calculatedTpdDisplay = ((Number(population) * parsedPerCapita) / 1000000).toFixed(2);
 
   const addCompostUnit = () => {
     setCompostUnits([...compostUnits, { id: `c${Date.now()}`, label: lang === 'hi' ? 'नई कम्पोस्ट यूनिट' : 'New Compost Unit', type: 'Windrow Pad', capacity: 5 }]);
@@ -330,6 +329,7 @@ export default function App() {
     <div style={{ fontFamily: 'sans-serif', background: '#f8fafc', minHeight: '100vh', padding: '15px' }}>
       <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
         
+        {/* HEADER */}
         <div style={{ background: 'linear-gradient(135deg, #064e3b 0%, #047857 100%)', color: '#fff', padding: '20px', borderRadius: '8px', marginBottom: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
             <div>
@@ -347,6 +347,18 @@ export default function App() {
           </div>
         </div>
 
+        {/* CROSS-LINK BANNER TO STANDALONE APP */}
+        <div style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div>
+            <h3 style={{ margin: 0, color: '#334155', fontSize: '14px' }}>{lang === 'hi' ? 'सिंगल-फैसिलिटी लॉग-बुक चाहिए?' : 'Need Single-Facility Logbooks?'}</h3>
+            <p style={{ margin: 0, color: '#64748b', fontSize: '12px' }}>{lang === 'hi' ? 'केवल ₹100/माह में साधारण ULB/MRF जनरेटर खोलें।' : 'Use our standalone ULB, MRF, or Mixed waste tool starting at ₹100/mo.'}</p>
+          </div>
+          <a href="https://ulb-waste-generator.vercel.app/" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', padding: '8px 14px', background: '#334155', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <ArrowLeft size={14} /> Open Standalone App
+          </a>
+        </div>
+
+        {/* FORM */}
         <form onSubmit={handleGenerate} style={{ background: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '20px' }}>
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '14px' }}>
@@ -380,6 +392,7 @@ export default function App() {
             </div>
           </div>
 
+          {/* COMPOST UNITS */}
           <div style={{ background: '#f0fdf4', padding: '12px', borderRadius: '6px', border: '1px solid #bbf7d0', marginBottom: '14px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <strong style={{ fontSize: '13px', color: '#166534' }}>Composting Assets (Wet Line)</strong>
@@ -400,6 +413,7 @@ export default function App() {
             ))}
           </div>
 
+          {/* MRF UNITS */}
           <div style={{ background: '#f0f9ff', padding: '12px', borderRadius: '6px', border: '1px solid #bae6fd', marginBottom: '14px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <strong style={{ fontSize: '13px', color: '#0369a1' }}>MRF / Sorting Shed Assets (Dry Line)</strong>
@@ -425,6 +439,7 @@ export default function App() {
           </button>
         </form>
 
+        {/* PREVIEW */}
         {generatedMonthlyData && (
           <div ref={resultsRef} style={{ background: '#fff', padding: '15px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -519,11 +534,5 @@ export default function App() {
 
       </div>
     </div>
-
-      </div>
-    </div>
-  );
-}
-
   );
 }
