@@ -128,7 +128,7 @@ export default function App() {
   const isSegBalanced = Math.abs(targetSegregatedTpd - allocatedSegregated) <= 0.02;
   const isMassBalanced = isMixedBalanced && isSegBalanced;
 
-  // NEW: MRF Fractions 100% Validation
+  // MRF Fractions 100% Validation
   const invalidMrfs = facilities.filter(f => {
     if (f.type !== 'dry_mrf') return false;
     const totalPct = (f.mrfFractions || []).reduce((sum, frac) => sum + Number(frac.percentage || 0), 0);
@@ -287,7 +287,7 @@ export default function App() {
 
     selectedMonths.forEach((m) => {
       const days = new Date(startYear, m, 0).getDate();
-      const seedString = `INTEGRATED-MASS-BALANCE-V5-${selectedState}-${name}-${startYear}-${m}-${targetTotalTpd}-${segregationRate}`;
+      const seedString = `INTEGRATED-MASS-BALANCE-V6-${selectedState}-${name}-${startYear}-${m}-${targetTotalTpd}-${segregationRate}`;
       const random = mulberry32(cyrb128(seedString));
       let logs = [];
 
@@ -295,6 +295,7 @@ export default function App() {
         const dateStr = `${startYear}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const dayName = new Date(startYear, m - 1, day).toLocaleDateString('en-US', { weekday: 'short' });
 
+        // Gate Intake Noise (±5%)
         let noise = 0.95 + random() * 0.10;
         const dailyGateTotal = Number((targetTotalTpd * noise).toFixed(3));
         
@@ -309,31 +310,50 @@ export default function App() {
           if (f.type === 'mixed_trommel') {
             const ratio = allocatedMixed > 0 ? f.avgProcessing / allocatedMixed : 0;
             fIntake = Number((dailyMixed * ratio).toFixed(3));
+            
+            // Apply Natural Noise to Fines & RDF, assign remainder to Inerts for perfect balance
+            const finesNoise = 0.85 + random() * 0.30;
+            const rdfNoise = 0.85 + random() * 0.30;
+            const organicFines = Number((fIntake * 0.45 * finesNoise).toFixed(3));
+            const coarseRdf = Number((fIntake * 0.35 * rdfNoise).toFixed(3));
+            const heavyInerts = Number(Math.max(0, fIntake - organicFines - coarseRdf).toFixed(3));
+
             outputs = {
               intake: fIntake,
-              organicFines: Number((fIntake * 0.45).toFixed(3)),
-              coarseRdf: Number((fIntake * 0.35).toFixed(3)),
-              heavyInerts: Number((fIntake * 0.20).toFixed(3))
+              organicFines,
+              coarseRdf,
+              heavyInerts
             };
           } else {
             const ratio = allocatedSegregated > 0 ? f.avgProcessing / allocatedSegregated : 0;
             fIntake = Number((dailySegregated * ratio).toFixed(3));
             
             if (f.type === 'wet_compost' || f.type === 'vermicompost') {
+              const yieldNoise = 0.85 + random() * 0.30;
+              const rejectNoise = 0.80 + random() * 0.40;
               outputs = {
                 intake: fIntake,
-                enzyme: Number((fIntake * 2.5).toFixed(2)),
+                enzyme: Number((fIntake * 2.5 * (0.9 + random() * 0.2)).toFixed(2)),
                 activePileNo: `Pile-${((day - 1) % 12) + 1}`,
-                compostYield: Number((fIntake * 0.18).toFixed(3)),
-                rejects: Number((fIntake * 0.05).toFixed(3))
+                compostYield: Number((fIntake * 0.18 * yieldNoise).toFixed(3)),
+                rejects: Number((fIntake * 0.05 * rejectNoise).toFixed(3))
               };
             } else if (f.type === 'dry_mrf') {
               let fractionBreakdown = {};
               const fractions = f.mrfFractions || [];
               const totalPct = fractions.reduce((s, frac) => s + Number(frac.percentage || 0), 0) || 100;
               
-              fractions.forEach(frac => {
-                fractionBreakdown[frac.id] = Number((fIntake * (Number(frac.percentage || 0) / totalPct)).toFixed(3));
+              let accumulatedWeight = 0;
+              fractions.forEach((frac, index) => {
+                if (index === fractions.length - 1) {
+                  // Last fraction mathematically absorbs remainder to ensure 100% strict balance
+                  fractionBreakdown[frac.id] = Number(Math.max(0, fIntake - accumulatedWeight).toFixed(3));
+                } else {
+                  const fracNoise = 0.85 + random() * 0.30;
+                  const noisyWeight = Number((fIntake * (Number(frac.percentage || 0) / totalPct) * fracNoise).toFixed(3));
+                  fractionBreakdown[frac.id] = noisyWeight;
+                  accumulatedWeight += noisyWeight;
+                }
               });
 
               outputs = {
@@ -344,15 +364,17 @@ export default function App() {
               outputs = {
                 intake: fIntake,
                 digesterPressure: Number((1.2 + random() * 0.3).toFixed(2)),
-                biogasGenerated: Number((fIntake * 65).toFixed(1)),
-                digestate: Number((fIntake * 0.25).toFixed(3))
+                biogasGenerated: Number((fIntake * 65 * (0.9 + random() * 0.2)).toFixed(1)),
+                digestate: Number((fIntake * 0.25 * (0.85 + random() * 0.30)).toFixed(3))
               };
             } else {
+              const dispatchNoise = 0.80 + random() * 0.40;
+              const dispatchedTsdf = Number((fIntake * 0.10 * dispatchNoise).toFixed(3));
               outputs = {
                 intake: fIntake,
-                safeStorage: Number((fIntake * 0.90).toFixed(3)),
+                safeStorage: Number(Math.max(0, fIntake - dispatchedTsdf).toFixed(3)),
                 manifestNo: `TSDF-2026-${String(day).padStart(3, '0')}`,
-                dispatchedTsdf: Number((fIntake * 0.10).toFixed(3))
+                dispatchedTsdf
               };
             }
           }
