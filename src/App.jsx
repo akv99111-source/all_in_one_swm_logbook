@@ -239,7 +239,7 @@ export default function App() {
     setFacilities(updated);
   };
 
-  const getSessionKey = () => `crf_paid_INT_v4_${name.trim().toLowerCase().replace(/\s+/g, '_')}_${selectedMonths.join('_')}_${startYear}`;
+  const getSessionKey = () => `crf_paid_INT_v5_${name.trim().toLowerCase().replace(/\s+/g, '_')}_${selectedMonths.join('_')}_${startYear}`;
 
   useEffect(() => {
     const rawData = localStorage.getItem(getSessionKey());
@@ -287,17 +287,30 @@ export default function App() {
 
     selectedMonths.forEach((m) => {
       const days = new Date(startYear, m, 0).getDate();
-      const seedString = `INTEGRATED-MASS-BALANCE-V6-${selectedState}-${name}-${startYear}-${m}-${targetTotalTpd}-${segregationRate}`;
+      const seedString = `INTEGRATED-MASS-BALANCE-V7-${selectedState}-${name}-${startYear}-${m}-${targetTotalTpd}-${segregationRate}`;
       const random = mulberry32(cyrb128(seedString));
+      
+      // SEASONAL VARIATION LOGIC
+      let seasonalGateMultiplier = 1.0;
+      let seasonalCompostBaseYield = 0.18;
+      
+      if ([7, 8, 9].includes(m)) {
+        seasonalGateMultiplier = 1.05; // Monsoon: ~5% heavier due to wet waste
+        seasonalCompostBaseYield = 0.16; // Monsoon: Lower dry compost yield from heavy wet feed
+      } else if ([4, 5, 6].includes(m)) {
+        seasonalGateMultiplier = 0.95; // Summer: ~5% lighter due to dryness
+        seasonalCompostBaseYield = 0.20; // Summer: Higher efficiency
+      }
+
       let logs = [];
 
       for (let day = 1; day <= days; day++) {
         const dateStr = `${startYear}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const dayName = new Date(startYear, m - 1, day).toLocaleDateString('en-US', { weekday: 'short' });
 
-        // Gate Intake Noise (±5%)
-        let noise = 0.95 + random() * 0.10;
-        const dailyGateTotal = Number((targetTotalTpd * noise).toFixed(3));
+        // Apply Natural Daily Noise + Seasonal Modifier to Gate Intake
+        let dailyNoise = 0.95 + random() * 0.10;
+        const dailyGateTotal = Number((targetTotalTpd * dailyNoise * seasonalGateMultiplier).toFixed(3));
         
         const dailySegregated = Number((dailyGateTotal * (segregationRate / 100)).toFixed(3));
         const dailyMixed = Number((dailyGateTotal - dailySegregated).toFixed(3));
@@ -311,19 +324,15 @@ export default function App() {
             const ratio = allocatedMixed > 0 ? f.avgProcessing / allocatedMixed : 0;
             fIntake = Number((dailyMixed * ratio).toFixed(3));
             
-            // Apply Natural Noise to Fines & RDF, assign remainder to Inerts for perfect balance
+            // Fines and RDF natural noise, remaining balance to inerts
             const finesNoise = 0.85 + random() * 0.30;
             const rdfNoise = 0.85 + random() * 0.30;
             const organicFines = Number((fIntake * 0.45 * finesNoise).toFixed(3));
             const coarseRdf = Number((fIntake * 0.35 * rdfNoise).toFixed(3));
             const heavyInerts = Number(Math.max(0, fIntake - organicFines - coarseRdf).toFixed(3));
 
-            outputs = {
-              intake: fIntake,
-              organicFines,
-              coarseRdf,
-              heavyInerts
-            };
+            outputs = { intake: fIntake, organicFines, coarseRdf, heavyInerts };
+
           } else {
             const ratio = allocatedSegregated > 0 ? f.avgProcessing / allocatedSegregated : 0;
             fIntake = Number((dailySegregated * ratio).toFixed(3));
@@ -331,11 +340,14 @@ export default function App() {
             if (f.type === 'wet_compost' || f.type === 'vermicompost') {
               const yieldNoise = 0.85 + random() * 0.30;
               const rejectNoise = 0.80 + random() * 0.40;
+              // Enzyme dose increases slightly during monsoon
+              const enzymeMult = [7,8,9].includes(m) ? 1.2 : 1.0; 
+              
               outputs = {
                 intake: fIntake,
-                enzyme: Number((fIntake * 2.5 * (0.9 + random() * 0.2)).toFixed(2)),
+                enzyme: Number((fIntake * 2.5 * enzymeMult * (0.9 + random() * 0.2)).toFixed(2)),
                 activePileNo: `Pile-${((day - 1) % 12) + 1}`,
-                compostYield: Number((fIntake * 0.18 * yieldNoise).toFixed(3)),
+                compostYield: Number((fIntake * seasonalCompostBaseYield * yieldNoise).toFixed(3)),
                 rejects: Number((fIntake * 0.05 * rejectNoise).toFixed(3))
               };
             } else if (f.type === 'dry_mrf') {
@@ -346,7 +358,7 @@ export default function App() {
               let accumulatedWeight = 0;
               fractions.forEach((frac, index) => {
                 if (index === fractions.length - 1) {
-                  // Last fraction mathematically absorbs remainder to ensure 100% strict balance
+                  // Final fraction perfectly balances to 100% of input
                   fractionBreakdown[frac.id] = Number(Math.max(0, fIntake - accumulatedWeight).toFixed(3));
                 } else {
                   const fracNoise = 0.85 + random() * 0.30;
@@ -356,10 +368,8 @@ export default function App() {
                 }
               });
 
-              outputs = {
-                intake: fIntake,
-                fractions: fractionBreakdown
-              };
+              outputs = { intake: fIntake, fractions: fractionBreakdown };
+
             } else if (f.type === 'biomethanation') {
               outputs = {
                 intake: fIntake,
@@ -873,8 +883,8 @@ export default function App() {
                           <th style={{ textAlign: 'right' }}>Organic Input (Tons)</th>
                           <th style={{ textAlign: 'right' }}>Bio-Enzyme (L)</th>
                           <th>Active Pile</th>
-                          <th style={{ textAlign: 'right' }}>Compost Yield (18%)</th>
-                          <th style={{ textAlign: 'right' }}>Inert Rejects (5%)</th>
+                          <th style={{ textAlign: 'right' }}>Compost Yield (Tons)</th>
+                          <th style={{ textAlign: 'right' }}>Inert Rejects (Tons)</th>
                         </tr>
                       );
                     } else if (selectedF.type === 'dry_mrf') {
