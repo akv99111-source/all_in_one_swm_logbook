@@ -477,10 +477,13 @@ export default function App() {
 
     try {
       const u = displayUnit === 'kg' ? 'kg' : 'Tons';
-      const wb = XLSX.utils.book_new();
 
+      // Iterate through each selected month and download a separate file
       selectedMonths.forEach((mId) => {
-        const monthName = MONTHS.find(m => m.id === mId)?.shortEn || `M${mId}`;
+        const wb = XLSX.utils.book_new();
+        const monthData = MONTHS.find(m => m.id === mId);
+        const monthName = monthData?.shortEn || `M${mId}`;
+        const fullMonthName = monthData?.fullEn || `Month${mId}`;
 
         // 1. Master Gate Intake Sheet
         const gateHeaders = ["Date", "Day", `Total Gate Intake (${u})`, `Segregated Stream (${u})`, `Mixed Stream (${u})`, ...facilities.map(f => `${f.name} Allocated (${u})`)];
@@ -545,9 +548,12 @@ export default function App() {
           const safeSheetName = `${monthName}_F${idx + 1}_${f.name.replace(/[^a-zA-Z0-9]/g, '')}`.substring(0, 31);
           XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers, ...rows]), safeSheetName);
         });
+
+        // Save a separate file for this specific month
+        const safeFileName = `Integrated_Master_Suite_${name.replace(/\s+/g, '_')}_${fullMonthName}_${startYear}.xlsx`;
+        XLSX.writeFile(wb, safeFileName);
       });
 
-      XLSX.writeFile(wb, `Integrated_Master_Suite_${name.replace(/\s+/g, '_')}.xlsx`);
     } catch (err) {
       alert('Excel Generation Error: ' + err.message);
     }
