@@ -1,69 +1,70 @@
 export default async function handler(req, res) {
-  // CORS & Method Check
   if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Only POST requests allowed' });
+    return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
   const { amount, customerName, customerPhone } = req.body;
 
-  // Environment Variables
-  const appId = process.env.CASHFREE_APP_ID;
-  const secretKey = process.env.CASHFREE_SECRET_KEY;
-  const cashfreeMode = process.env.VITE_CASHFREE_MODE || 'sandbox';
-
-  if (!appId || !secretKey) {
-    return res.status(500).json({ message: 'Missing Cashfree API keys in Vercel environment variables.' });
-  }
-
-  // Choose URL based on mode
-  const baseUrl = cashfreeMode === 'production' 
-    ? 'https://api.cashfree.com/pg/orders' 
-    : 'https://sandbox.cashfree.com/pg/orders';
-
-  // Dynamic Host Detection for Return URL
-  const protocol = req.headers['x-forwarded-proto'] || 'https';
-  const host = req.headers['host'];
-  const returnUrl = `${protocol}://${host}/`;
-
   try {
-    const orderPayload = {
-      order_id: `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-      order_amount: Number(amount),
+    // 1. Setup Cashfree Payload
+    const orderData = {
+      order_amount: amount,
       order_currency: 'INR',
       customer_details: {
         customer_id: `cust_${Date.now()}`,
-        customer_name: customerName || 'SWM User',
-        customer_phone: customerPhone
+        customer_name: customerName || 'ULB User',
+        customer_phone: customerPhone || '9999999999',
       },
       order_meta: {
-        return_url: returnUrl
-      }
+        // Change this if you have a specific return URL
+        return_url: 'https://all-in-one-swm-logbook.vercel.app/?order_id={order_id}', 
+      },
     };
 
-    const response = await fetch(baseUrl, {
+    // Use production URL if mode is set, otherwise default to sandbox
+    const isProd = process.env.VITE_CASHFREE_MODE === 'production';
+    const endpoint = isProd 
+      ? 'https://api.cashfree.com/pg/orders' 
+      : 'https://sandbox.cashfree.com/pg/orders';
+
+    // 2. Make the request to Cashfree
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-version': '2023-08-01',
-        'x-client-id': appId,
-        'x-client-secret': secretKey
+        'x-client-id': process.env.CASHFREE_APP_ID,
+        'x-client-secret': process.env.CASHFREE_SECRET_KEY,
+        'x-api-version': '2023-08-01', // CRITICAL: Cashfree fails without this
       },
-      body: JSON.stringify(orderPayload)
+      body: JSON.stringify(orderData),
     });
 
-    const data = await response.json();
+    // 3. SAFE PARSING: Read raw text first to prevent HTML/JSON crash
+    const rawText = await response.text();
 
-    if (!response.ok) {
-      return res.status(response.status).json({ 
-        message: data.message || 'Failed to create Cashfree order',
-        details: data 
+    // If Cashfree returned an HTML error page (starts with <)
+    if (rawText.trim().startsWith('<')) {
+      console.error("CASHFREE RETURNED HTML ERROR:", rawText);
+      return res.status(502).json({ 
+        message: "Cashfree Gateway Error: Received HTML instead of JSON. Check Vercel Logs." 
       });
     }
 
-    // Return order object containing payment_session_id to App.jsx
+    // 4. Parse the valid JSON
+    const data = JSON.parse(rawText);
+
+    if (!response.ok) {
+      console.error("CASHFREE API REJECTED:", data);
+      return res.status(response.status).json({ 
+        message: data.message || 'Payment initiation failed at Cashfree' 
+      });
+    }
+
+    // 5. Success
     return res.status(200).json(data);
+
   } catch (error) {
-    console.error('Cashfree Order Error:', error);
+    console.error("BACKEND CRASH:", error);
     return res.status(500).json({ message: error.message });
   }
 }
