@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Building2, Download, Lock, Globe, ShieldCheck, Plus, Trash2, Layers, ArrowLeft, Settings2, FileSpreadsheet } from 'lucide-react';
+import { Building2, Download, Lock, Globe, ShieldCheck, Plus, Trash2, ArrowLeft, Settings2, FileSpreadsheet, BookOpen, CheckCircle2, AlertTriangle, Zap } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const MONTHS = [
@@ -79,19 +79,13 @@ export default function App() {
   const [ulbCalculationMode, setUlbCalculationMode] = useState('population');
   const [population, setPopulation] = useState(50000);
   const [perCapitaOption, setPerCapitaOption] = useState('450');
-  const [actualAverageTpd, setActualAverageTpd] = useState(20);
-  const [segregationRate, setSegregationRate] = useState(80);
+  const [actualAverageTpd, setActualAverageTpd] = useState(22.5);
 
-  const [enableMixedPlant, setEnableMixedPlant] = useState(true);
-  const [mixedPlantCapacity, setMixedPlantCapacity] = useState(10);
-
-  const [compostUnits, setCompostUnits] = useState([
-    { id: 'c1', label: 'Windrow Pad 1', type: 'Windrow Pad', capacity: 5 },
-    { id: 'c2', label: 'Windrow Pad 2', type: 'Windrow Pad', capacity: 5 }
-  ]);
-  const [mrfUnits, setMrfUnits] = useState([
-    { id: 'm1', label: 'MRF Shed 1', type: 'Manual Sorting Shed', capacity: 5 },
-    { id: 'm2', label: 'MRF Shed 2', type: 'Manual Sorting Shed', capacity: 5 }
+  // Dynamic Facilities State Array
+  const [facilities, setFacilities] = useState([
+    { id: 'f1', name: 'Windrow Compost Pad 1', type: 'wet_compost', designCapacity: 15, avgProcessing: 12.5 },
+    { id: 'f2', name: 'Dry MRF Sorting Shed', type: 'dry_mrf', designCapacity: 10, avgProcessing: 6.0 },
+    { id: 'f3', name: 'Trommel Screening Unit', type: 'mixed_trommel', designCapacity: 5, avgProcessing: 4.0 }
   ]);
   
   const [startYear, setStartYear] = useState(2026);
@@ -107,30 +101,46 @@ export default function App() {
 
   const resultsRef = useRef(null);
   const parsedPerCapita = Number(perCapitaOption);
-  const calculatedTpdDisplay = ((Number(population) * parsedPerCapita) / 1000000).toFixed(2);
+  
+  // Calculate Total Target TPD
+  const targetTotalTpd = ulbCalculationMode === 'population' 
+    ? Number(((Number(population) * parsedPerCapita) / 1000000).toFixed(2))
+    : Number(Number(actualAverageTpd || 0).toFixed(2));
 
-  const addCompostUnit = () => {
-    setCompostUnits([...compostUnits, { id: `c_${Date.now()}`, label: `Windrow Pad ${compostUnits.length + 1}`, type: 'Windrow Pad', capacity: 5 }]);
+  // Sum of Facility Average Processing TPD
+  const totalAllocatedTpd = Number(facilities.reduce((acc, f) => acc + Number(f.avgProcessing || 0), 0).toFixed(2));
+  const isMassBalanced = Math.abs(targetTotalTpd - totalAllocatedTpd) < 0.01;
+
+  const addFacility = () => {
+    setFacilities([
+      ...facilities,
+      { id: `proc_${Date.now()}`, name: `Processing Facility ${facilities.length + 1}`, type: 'wet_compost', designCapacity: 5, avgProcessing: 0 }
+    ]);
   };
 
-  const removeCompostUnit = (id) => {
-    if (compostUnits.length > 1) setCompostUnits(compostUnits.filter(u => u.id !== id));
+  const removeFacility = (id) => {
+    if (facilities.length > 1) setFacilities(facilities.filter(f => f.id !== id));
   };
 
-  const updateCompostUnit = (id, field, value) => {
-    setCompostUnits(compostUnits.map(u => u.id === id ? { ...u, [field]: value } : u));
+  const updateFacility = (id, field, value) => {
+    setFacilities(facilities.map(f => f.id === id ? { ...f, [field]: value } : f));
   };
 
-  const addMrfUnit = () => {
-    setMrfUnits([...mrfUnits, { id: `m_${Date.now()}`, label: `MRF Shed ${mrfUnits.length + 1}`, type: 'Manual Sorting Shed', capacity: 5 }]);
-  };
-
-  const removeMrfUnit = (id) => {
-    if (mrfUnits.length > 1) setMrfUnits(mrfUnits.filter(u => u.id !== id));
-  };
-
-  const updateMrfUnit = (id, field, value) => {
-    setMrfUnits(mrfUnits.map(u => u.id === id ? { ...u, [field]: value } : u));
+  const autoBalanceAllocation = () => {
+    if (facilities.length === 0) return;
+    const totalDesignCap = facilities.reduce((acc, f) => acc + Number(f.designCapacity || 1), 0);
+    
+    let allocatedSum = 0;
+    const updated = facilities.map((f, idx) => {
+      if (idx === facilities.length - 1) {
+        const remaining = Number((targetTotalTpd - allocatedSum).toFixed(2));
+        return { ...f, avgProcessing: Math.max(0, remaining) };
+      }
+      const share = Number(((Number(f.designCapacity || 1) / totalDesignCap) * targetTotalTpd).toFixed(2));
+      allocatedSum += share;
+      return { ...f, avgProcessing: share };
+    });
+    setFacilities(updated);
   };
 
   const getSessionKey = () => `crf_paid_INTEGRATED_${name.trim().toLowerCase().replace(/\s+/g, '_')}_${selectedMonths.join('_')}_${startYear}`;
@@ -172,15 +182,16 @@ export default function App() {
 
   const handleGenerate = (e) => {
     e.preventDefault();
+    if (!isMassBalanced) {
+      alert(`Mass Balance Error: Total Facility Allocated Processing (${totalAllocatedTpd} TPD) must strictly equal Total Intake (${targetTotalTpd} TPD). Click 'Auto-Balance' to resolve.`);
+      return;
+    }
+
     let monthlyDataMap = {};
 
     selectedMonths.forEach((m) => {
       const days = new Date(startYear, m, 0).getDate();
-      let targetTons = ulbCalculationMode === 'population' 
-        ? (Number(population) * parsedPerCapita) / 1000000 
-        : Number(actualAverageTpd);
-
-      const seedString = `INTEGRATED-FULL-${selectedState}-${name}-${startYear}-${m}-${ulbCalculationMode}-${targetTons}-${segregationRate}-${enableMixedPlant}`;
+      const seedString = `INTEGRATED-MASS-BALANCE-${selectedState}-${name}-${startYear}-${m}-${targetTotalTpd}-${facilities.length}`;
       const random = mulberry32(cyrb128(seedString));
       let logs = [];
 
@@ -189,61 +200,58 @@ export default function App() {
         const dayName = new Date(startYear, m - 1, day).toLocaleDateString('en-US', { weekday: 'short' });
 
         let noise = 0.95 + random() * 0.10;
-        const dailyTotal = targetTons * noise;
+        const dailyGateTotal = Number((targetTotalTpd * noise).toFixed(3));
 
-        const segFrac = segregationRate / 100;
-        const unsegFrac = 1 - segFrac;
+        // Proportional facility daily intake calculation
+        let facilityBreakdown = {};
+        facilities.forEach((f) => {
+          const ratio = targetTotalTpd > 0 ? f.avgProcessing / targetTotalTpd : 0;
+          const fIntake = Number((dailyGateTotal * ratio).toFixed(3));
 
-        const segregatedTotal = dailyTotal * segFrac;
-        const unsegregatedMixed = Number((dailyTotal * unsegFrac).toFixed(3));
-        
-        const wetSeg = Number((segregatedTotal * 0.60).toFixed(3));
-        const drySeg = Number((segregatedTotal * 0.32).toFixed(3));
-        const hazSeg = Number((segregatedTotal * 0.03).toFixed(3));
-        const sanSeg = Number((segregatedTotal * 0.05).toFixed(3));
+          let outputs = {};
+          if (f.type === 'wet_compost' || f.type === 'vermicompost') {
+            outputs = {
+              intake: fIntake,
+              enzyme: Number((fIntake * 2.5).toFixed(2)),
+              compostYield: Number((fIntake * 0.18).toFixed(3)),
+              rejects: Number((fIntake * 0.05).toFixed(3))
+            };
+          } else if (f.type === 'dry_mrf') {
+            outputs = {
+              intake: fIntake,
+              recyclables: Number((fIntake * 0.55).toFixed(3)),
+              rdf: Number((fIntake * 0.35).toFixed(3)),
+              inerts: Number((fIntake * 0.10).toFixed(3))
+            };
+          } else if (f.type === 'mixed_trommel') {
+            outputs = {
+              intake: fIntake,
+              organicFines: Number((fIntake * 0.45).toFixed(3)),
+              coarseRdf: Number((fIntake * 0.35).toFixed(3)),
+              heavyInerts: Number((fIntake * 0.20).toFixed(3))
+            };
+          } else if (f.type === 'biomethanation') {
+            outputs = {
+              intake: fIntake,
+              biogasGenerated: Number((fIntake * 65).toFixed(1)), // M3 per ton
+              digestate: Number((fIntake * 0.25).toFixed(3))
+            };
+          } else {
+            outputs = {
+              intake: fIntake,
+              safeStorage: Number((fIntake * 0.90).toFixed(3)),
+              dispatchedTsdf: Number((fIntake * 0.10).toFixed(3))
+            };
+          }
 
-        let organicFines = 0;
-        let dryOversize = 0;
-        let heavyInerts = 0;
-
-        if (enableMixedPlant) {
-          organicFines = Number((unsegregatedMixed * 0.45).toFixed(3));
-          dryOversize = Number((unsegregatedMixed * 0.35).toFixed(3));
-          heavyInerts = Number((unsegregatedMixed * 0.20).toFixed(3));
-        } else {
-          heavyInerts = unsegregatedMixed;
-        }
-
-        const totalCompostFeed = wetSeg + organicFines;
-        const totalCompostCapacity = compostUnits.reduce((acc, u) => acc + Number(u.capacity || 1), 0);
-        let compostUnitBreakdown = {};
-        compostUnits.forEach(unit => {
-          const unitShare = (Number(unit.capacity || 1) / totalCompostCapacity) * totalCompostFeed;
-          compostUnitBreakdown[unit.id] = {
-            feed: Number(unitShare.toFixed(3)),
-            compostYield: Number((unitShare * 0.18).toFixed(3))
-          };
-        });
-
-        const totalMrfFeed = drySeg + dryOversize;
-        const totalMrfCapacity = mrfUnits.reduce((acc, u) => acc + Number(u.capacity || 1), 0);
-        let mrfUnitBreakdown = {};
-        mrfUnits.forEach(unit => {
-          const unitShare = (Number(unit.capacity || 1) / totalMrfCapacity) * totalMrfFeed;
-          mrfUnitBreakdown[unit.id] = {
-            feed: Number(unitShare.toFixed(3)),
-            recyclables: Number((unitShare * 0.65).toFixed(3)),
-            rdf: Number((unitShare * 0.25).toFixed(3))
-          };
+          facilityBreakdown[f.id] = outputs;
         });
 
         logs.push({
-          date: dateStr, dayName, totalIntake: Number(dailyTotal.toFixed(3)),
-          wetSeg, drySeg, hazSeg, sanSeg, unsegregatedMixed,
-          organicFines, dryOversize, heavyInerts,
-          totalCompostFeed: Number(totalCompostFeed.toFixed(3)),
-          totalMrfFeed: Number(totalMrfFeed.toFixed(3)),
-          compostUnitBreakdown, mrfUnitBreakdown
+          date: dateStr,
+          dayName,
+          totalIntake: dailyGateTotal,
+          facilityBreakdown
         });
       }
       monthlyDataMap[m] = logs;
@@ -327,32 +335,66 @@ export default function App() {
       selectedMonths.forEach((mId) => {
         const monthName = MONTHS.find(m => m.id === mId)?.shortEn || `M${mId}`;
 
-        // 1. Gate Intake Sheet
-        const gateHeaders = ["Date", "Day", `Total Gate Intake (${u})`, `Segregated Wet (${u})`, `Segregated Dry (${u})`, `Domestic Hazardous (${u})`, `Domestic Sanitary (${u})`, `Unsegregated Mixed (${u})`];
-        const gateRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.totalIntake), formatVal(r.wetSeg), formatVal(r.drySeg), formatVal(r.hazSeg), formatVal(r.sanSeg), formatVal(r.unsegregatedMixed)]);
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([gateHeaders, ...gateRows]), `${monthName}_Gate`);
+        // 1. Master Gate Intake Sheet
+        const gateHeaders = ["Date", "Day", `Total Gate Intake (${u})`, ...facilities.map(f => `${f.name} Allocated (${u})`)];
+        const gateRows = generatedMonthlyData[mId].map(r => [
+          r.date, r.dayName, formatVal(r.totalIntake),
+          ...facilities.map(f => formatVal(r.facilityBreakdown[f.id]?.intake))
+        ]);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([gateHeaders, ...gateRows]), `${monthName}_GateIntake`);
 
-        // 2. Mixed Waste Plant Sheet
-        if (enableMixedPlant) {
-          const preHeaders = ["Date", "Day", `Mixed Intake (${u})`, `Fine Screen Organics (${u})`, `Coarse Screen RDF (${u})`, `Heavy Inerts (${u})`];
-          const preRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.unsegregatedMixed), formatVal(r.organicFines), formatVal(r.dryOversize), formatVal(r.heavyInerts)]);
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([preHeaders, ...preRows]), `${monthName}_Mixed`);
-        }
+        // 2. Individual Dynamic Facility Sheets
+        facilities.forEach((f, idx) => {
+          let headers = [];
+          let rows = [];
 
-        // 3. Compost Unit Sheets (Unique Name Indexing)
-        compostUnits.forEach((unit, idx) => {
-          const cHeaders = ["Date", "Day", `Unit Feed (${u})`, `Compost Yield (${u})`];
-          const cRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.compostUnitBreakdown[unit.id]?.feed), formatVal(r.compostUnitBreakdown[unit.id]?.compostYield)]);
-          const sheetName = `${monthName}_C${idx + 1}_${unit.label.replace(/[^a-zA-Z0-9]/g, '')}`.substring(0, 31);
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([cHeaders, ...cRows]), sheetName);
-        });
+          if (f.type === 'wet_compost' || f.type === 'vermicompost') {
+            headers = ["Date", "Day", `Organic Feed (${u})`, "Enzyme Dose (Liters)", `Compost Yield (${u})`, `Inert Rejects (${u})`];
+            rows = generatedMonthlyData[mId].map(r => [
+              r.date, r.dayName,
+              formatVal(r.facilityBreakdown[f.id]?.intake),
+              r.facilityBreakdown[f.id]?.enzyme,
+              formatVal(r.facilityBreakdown[f.id]?.compostYield),
+              formatVal(r.facilityBreakdown[f.id]?.rejects)
+            ]);
+          } else if (f.type === 'dry_mrf') {
+            headers = ["Date", "Day", `Dry Feed (${u})`, `Sorted Recyclables (${u})`, `RDF Dispatched (${u})`, `Inerts (${u})`];
+            rows = generatedMonthlyData[mId].map(r => [
+              r.date, r.dayName,
+              formatVal(r.facilityBreakdown[f.id]?.intake),
+              formatVal(r.facilityBreakdown[f.id]?.recyclables),
+              formatVal(r.facilityBreakdown[f.id]?.rdf),
+              formatVal(r.facilityBreakdown[f.id]?.inerts)
+            ]);
+          } else if (f.type === 'mixed_trommel') {
+            headers = ["Date", "Day", `Mixed Feed (${u})`, `Organic Fines (${u})`, `Coarse Screen RDF (${u})`, `Heavy Inerts (${u})`];
+            rows = generatedMonthlyData[mId].map(r => [
+              r.date, r.dayName,
+              formatVal(r.facilityBreakdown[f.id]?.intake),
+              formatVal(r.facilityBreakdown[f.id]?.organicFines),
+              formatVal(r.facilityBreakdown[f.id]?.coarseRdf),
+              formatVal(r.facilityBreakdown[f.id]?.heavyInerts)
+            ]);
+          } else if (f.type === 'biomethanation') {
+            headers = ["Date", "Day", `Organic Feed (${u})`, "Biogas Generated (m³)", `Bio-Digestate (${u})`];
+            rows = generatedMonthlyData[mId].map(r => [
+              r.date, r.dayName,
+              formatVal(r.facilityBreakdown[f.id]?.intake),
+              r.facilityBreakdown[f.id]?.biogasGenerated,
+              formatVal(r.facilityBreakdown[f.id]?.digestate)
+            ]);
+          } else {
+            headers = ["Date", "Day", `Daily Intake (${u})`, `Safe Stored (${u})`, `TSDF Transfer (${u})`];
+            rows = generatedMonthlyData[mId].map(r => [
+              r.date, r.dayName,
+              formatVal(r.facilityBreakdown[f.id]?.intake),
+              formatVal(r.facilityBreakdown[f.id]?.safeStorage),
+              formatVal(r.facilityBreakdown[f.id]?.dispatchedTsdf)
+            ]);
+          }
 
-        // 4. MRF Shed Sheets (Unique Name Indexing)
-        mrfUnits.forEach((unit, idx) => {
-          const mHeaders = ["Date", "Day", `Unit Feed (${u})`, `Sorted Recyclables (${u})`, `RDF Dispatched (${u})`];
-          const mRows = generatedMonthlyData[mId].map(r => [r.date, r.dayName, formatVal(r.mrfUnitBreakdown[unit.id]?.feed), formatVal(r.mrfUnitBreakdown[unit.id]?.recyclables), formatVal(r.mrfUnitBreakdown[unit.id]?.rdf)]);
-          const sheetName = `${monthName}_M${idx + 1}_${unit.label.replace(/[^a-zA-Z0-9]/g, '')}`.substring(0, 31);
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([mHeaders, ...mRows]), sheetName);
+          const safeSheetName = `${monthName}_F${idx + 1}_${f.name.replace(/[^a-zA-Z0-9]/g, '')}`.substring(0, 31);
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers, ...rows]), safeSheetName);
         });
       });
 
@@ -374,7 +416,7 @@ export default function App() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
             <div>
               <span style={{ background: 'rgba(255,255,255,0.2)', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <ShieldCheck size={12} /> MULTI-ASSET SWM ESTIMATION ENGINE
+                <ShieldCheck size={12} /> MASS-BALANCE SWM ESTIMATION SUITE
               </span>
               <h1 style={{ fontSize: '22px', margin: '6px 0 2px 0', fontWeight: '800' }}>
                 <Building2 size={22} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
@@ -387,17 +429,7 @@ export default function App() {
           </div>
         </div>
 
-     {/* CROSS-LINK BANNER TO STANDALONE APP */}
-<div style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-  <div>
-    <h3 style={{ margin: 0, color: '#334155', fontSize: '14px' }}>{lang === 'hi' ? 'सिंगल-फैसिलिटी लॉग-बुक चाहिए?' : 'Need Single-Facility Logbooks?'}</h3>
-    <p style={{ margin: 0, color: '#64748b', fontSize: '12px' }}>{lang === 'hi' ? 'केवल ₹100/माह में साधारण ULB/MRF जनरेटर खोलें।' : 'Use our standalone ULB, MRF, or Mixed waste tool starting at ₹100/mo.'}</p>
-  </div>
-  <a href="https://ulb-waste-generator.vercel.app/" style={{ textDecoration: 'none', padding: '8px 14px', background: '#334155', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
-    <ArrowLeft size={14} /> Open Standalone App
-  </a>
-</div>
-{/* CROSS-LINK BANNER */}
+        {/* CROSS-LINK BANNER */}
         <div style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
           <div>
             <h3 style={{ margin: 0, color: '#334155', fontSize: '14px' }}>{lang === 'hi' ? 'सिंगल-फैसिलिटी लॉग-बुक चाहिए?' : 'Need Single-Facility Logbooks?'}</h3>
@@ -407,92 +439,76 @@ export default function App() {
             <ArrowLeft size={14} /> Open Standalone App
           </a>
         </div>
-{/* BILINGUAL USER GUIDE CONTAINER */}
-<div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
-  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid #cbd5e1', paddingBottom: '8px' }}>
-    <h3 style={{ margin: 0, color: '#0369a1', fontSize: '15px', fontWeight: 'bold' }}>
-      📖 {lang === 'hi' ? 'लॉग-बुक जनरेटर उपयोग निर्देशिका (User Guide)' : 'User Guide & Operator Instructions'}
-    </h3>
-    <span style={{ fontSize: '11px', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
-      {lang === 'hi' ? 'सहायता गाइड' : 'Help Manual'}
-    </span>
-  </div>
 
-  {lang === 'hi' ? (
-    <div style={{ fontSize: '13px', color: '#0c4a6e', lineHeight: '1.6' }}>
-      <p style={{ margin: '0 0 8px 0', fontWeight: 'bold', color: '#0284c7' }}>
-        इस टूल का उपयोग करके 30-दिवसीय ऑडिट-रेडी SWM एक्सेल लॉग-बुक कैसे बनाएं:
-      </p>
-      <ol style={{ margin: 0, paddingLeft: '20px' }}>
-        <li style={{ marginBottom: '6px' }}>
-          <strong>बुनियादी विवरण दर्ज करें:</strong> अपने राज्य का चयन करें, अपनी निकाय/प्लांट का नाम लिखें और 10-अंकों का मोबाइल नंबर दर्ज करें।
-        </li>
-        <li style={{ marginBottom: '6px' }}>
-          <strong>कचरा क्षमता मोड चुनें:</strong> 
-          <ul style={{ paddingLeft: '16px', margin: '2px 0' }}>
-            <li><em>जनसंख्या आधारित:</em> बिना तौल-कांटा (Weighbridge) के मानक प्रति-व्यक्ति दर (450 ग्राम/दिन) से ऑटोमैटिक कैलकुलेट करें।</li>
-            <li><em>वास्तविक TPD:</em> यदि आपके पास वास्तविक तौल का आंकड़ा है, तो दैनिक औसत TPD दर्ज करें।</li>
-          </ul>
-        </li>
-        <li style={{ marginBottom: '6px' }}>
-          <strong>स्रोत पृथक्करण दर (%):</strong> डोर-टू-डोर कलेक्शन से आने वाले पृथक्कृत गीले/सूखे कचरे का प्रतिशत सेट करें।
-        </li>
-        <li style={{ marginBottom: '6px' }}>
-          <strong>प्लांट यूनिट्स और क्षमता जोड़ें:</strong> 
-          <ul style={{ paddingLeft: '16px', margin: '2px 0' }}>
-            <li><em>कम्पोस्ट यूनिट्स:</em> विंडरो पैड / वर्मी-कम्पोस्ट पिट्स और उनकी TPD क्षमता जोड़ें।</li>
-            <li><em>MRF शेड्स:</em> मैन्युअल सॉर्टिंग शेड या सेमी-ऑटोमेटेड लाइन्स जोड़ें।</li>
-            <li><em>मिक्स वेस्ट प्लांट:</em> मिश्रित कचरे से ऑर्गेनिक्स और RDF छंटाई के लिए ट्रॉमेल (Trommel) स्क्रीन चालू करें।</li>
-          </ul>
-        </li>
-        <li style={{ marginBottom: '6px' }}>
-          <strong>महीने चुनें:</strong> आवश्यकतानुसार महीने चुनें (हर 6ठा महीना बिल्कुल मुफ्त है)।
-        </li>
-        <li style={{ marginBottom: '6px' }}>
-          <strong>डेटासेट जनरेट करें:</strong> "Generate Master Dataset" पर क्लिक करें। पहले 5 दिनों का मुफ्त पूर्वावलोकन (Preview) देखें, फिर भुगतान पूरा करके पूरे महीने की Excel Workbook (.xlsx) डाउनलोड करें।
-        </li>
-      </ol>
-    </div>
-  ) : (
-    <div style={{ fontSize: '13px', color: '#0c4a6e', lineHeight: '1.6' }}>
-      <p style={{ margin: '0 0 8px 0', fontWeight: 'bold', color: '#0284c7' }}>
-        How to generate your 30-day audit-ready SWM Excel logbooks step-by-step:
-      </p>
-      <ol style={{ margin: 0, paddingLeft: '20px' }}>
-        <li style={{ marginBottom: '6px' }}>
-          <strong>Enter Basic Details:</strong> Select your State, type your ULB/Facility Name, and provide a valid 10-digit mobile number.
-        </li>
-        <li style={{ marginBottom: '6px' }}>
-          <strong>Choose Waste Calculation Mode:</strong>
-          <ul style={{ paddingLeft: '16px', margin: '2px 0' }}>
-            <li><em>Population Based:</em> Automatically estimates total daily waste using municipal per-capita benchmarks (450 g/person/day).</li>
-            <li><em>Actual TPD:</em> Select this if you weigh incoming trucks at a weighbridge and have an exact daily average.</li>
-          </ul>
-        </li>
-        <li style={{ marginBottom: '6px' }}>
-          <strong>Set Segregation Rate (%):</strong> Adjust the slider to match your doorstep source segregation percentage.
-        </li>
-        <li style={{ marginBottom: '6px' }}>
-          <strong>Configure Processing Assets:</strong>
-          <ul style={{ paddingLeft: '16px', margin: '2px 0' }}>
-            <li><em>Compost Units:</em> Add active windrow pads or vermicompost pits with TPD capacities.</li>
-            <li><em>MRF Sheds:</em> Add manual sorting sheds or recovery lines.</li>
-            <li><em>Mixed Waste Plant:</em> Toggle this option if processing unsegregated waste through trommel screens to derive organic fines and RDF.</li>
-          </ul>
-        </li>
-        <li style={{ marginBottom: '6px' }}>
-          <strong>Select Duration:</strong> Click month buttons to choose duration (every 6th month is free).
-        </li>
-        <li style={{ marginBottom: '6px' }}>
-          <strong>Preview & Export:</strong> Click "Generate Master Dataset" to review the first 5 days for free, then complete payment to download the complete Excel workbook (`.xlsx`).
-        </li>
-      </ol>
-    </div>
-  )}
-</div>
+        {/* USER GUIDE CONTAINER */}
+        <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid #cbd5e1', paddingBottom: '8px' }}>
+            <h3 style={{ margin: 0, color: '#0369a1', fontSize: '15px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <BookOpen size={18} /> {lang === 'hi' ? 'लॉग-बुक जनरेटर उपयोग निर्देशिका (User Guide)' : 'User Guide & Operator Instructions'}
+            </h3>
+            <span style={{ fontSize: '11px', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
+              {lang === 'hi' ? 'सहायता गाइड' : 'Help Manual'}
+            </span>
+          </div>
+
+          {lang === 'hi' ? (
+            <div style={{ fontSize: '13px', color: '#0c4a6e', lineHeight: '1.6' }}>
+              <p style={{ margin: '0 0 8px 0', fontWeight: 'bold', color: '#0284c7' }}>
+                इस टूल का उपयोग करके 30-दिवसीय ऑडिट-रेडी SWM एक्सेल लॉग-बुक कैसे बनाएं:
+              </p>
+              <ol style={{ margin: 0, paddingLeft: '20px' }}>
+                <li style={{ marginBottom: '6px' }}>
+                  <strong>बुनियादी विवरण दर्ज करें:</strong> अपने राज्य का चयन करें, अपनी निकाय/प्लांट का नाम लिखें और 10-अंकों का मोबाइल नंबर दर्ज करें।
+                </li>
+                <li style={{ marginBottom: '6px' }}>
+                  <strong>कचरा क्षमता मोड चुनें:</strong> 
+                  <ul style={{ paddingLeft: '16px', margin: '2px 0' }}>
+                    <li><em>जनसंख्या आधारित:</em> बिना तौल-कांटा के मानक दर (450 ग्राम/दिन) से ऑटोमैटिक कैलकुलेट करें।</li>
+                    <li><em>वास्तविक TPD:</em> यदि आपके पास वास्तविक तौल का आंकड़ा है, तो दैनिक औसत TPD दर्ज करें।</li>
+                  </ul>
+                </li>
+                <li style={{ marginBottom: '6px' }}>
+                  <strong>प्रोसेसिंग फैसिलिटीज और मास-बैलेंस सेट करें:</strong> अपनी सभी प्रोसेसिंग यूनिट्स (कम्पोस्ट, MRF, ट्रॉमेल, बायो-सीएनजी) जोड़ें। सुनिश्चित करें कि सभी यूनिट्स की औसत प्रोसेसिंग (Average Processing TPD) का योग कुल गेट कचरे के बराबर हो।
+                </li>
+                <li style={{ marginBottom: '6px' }}>
+                  <strong>महीने चुनें:</strong> आवश्यकतानुसार महीने चुनें (हर 6ठा महीना बिल्कुल मुफ्त है)।
+                </li>
+                <li style={{ marginBottom: '6px' }}>
+                  <strong>डेटासेट जनरेट करें:</strong> "Generate Master Dataset" पर क्लिक करें। पहले 5 दिनों का मुफ्त पूर्वावलोकन (Preview) देखें, फिर भुगतान पूरा करके पूरे महीने की Multi-Sheet Excel Workbook (.xlsx) डाउनलोड करें।
+                </li>
+              </ol>
+            </div>
+          ) : (
+            <div style={{ fontSize: '13px', color: '#0c4a6e', lineHeight: '1.6' }}>
+              <p style={{ margin: '0 0 8px 0', fontWeight: 'bold', color: '#0284c7' }}>
+                How to generate your 30-day audit-ready SWM Excel logbooks step-by-step:
+              </p>
+              <ol style={{ margin: 0, paddingLeft: '20px' }}>
+                <li style={{ marginBottom: '6px' }}>
+                  <strong>Enter Basic Details:</strong> Select your State, type your ULB/Facility Name, and provide a valid 10-digit mobile number.
+                </li>
+                <li style={{ marginBottom: '6px' }}>
+                  <strong>Choose Waste Calculation Mode:</strong>
+                  <ul style={{ paddingLeft: '16px', margin: '2px 0' }}>
+                    <li><em>Population Based:</em> Automatically estimates daily waste using municipal per-capita benchmarks (450 g/person/day).</li>
+                    <li><em>Actual TPD:</em> Select this if you weigh incoming trucks at a weighbridge and have an exact daily average.</li>
+                  </ul>
+                </li>
+                <li style={{ marginBottom: '6px' }}>
+                  <strong>Configure Processing Assets & Mass Balance:</strong> Add custom processing facilities (Compost Pads, MRF Sheds, Bio-CNG, Trommel). Ensure the sum of Average Processing TPD equals Total Gate Generation.
+                </li>
+                <li style={{ marginBottom: '6px' }}>
+                  <strong>Select Duration:</strong> Click month buttons to choose duration (every 6th month is free).
+                </li>
+                <li style={{ marginBottom: '6px' }}>
+                  <strong>Preview & Export:</strong> Click "Generate Master Dataset" to review the first 5 days for free, then complete payment to download the full Multi-Sheet Excel workbook (`.xlsx`).
+                </li>
+              </ol>
+            </div>
+          )}
+        </div>
+
         {/* MAIN FORM */}
-        <form onSubmit={handleGenerate} style={{ background: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '20px' }}>
-        {/* FORM */}
         <form onSubmit={handleGenerate} style={{ background: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '20px' }}>
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '14px' }}>
@@ -512,12 +528,13 @@ export default function App() {
             </div>
           </div>
 
+          {/* GATE INTAKE BASIS */}
           <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '14px' }}>
-            <strong style={{ fontSize: '13px', display: 'block', marginBottom: '10px' }}>Waste Estimation Basis & Segregation Rate</strong>
+            <strong style={{ fontSize: '13px', display: 'block', marginBottom: '10px' }}>1. Master Gate Refuse Estimation Basis</strong>
             
             <div style={{ display: 'flex', gap: '15px', marginBottom: '10px', fontSize: '13px' }}>
               <label style={{ cursor: 'pointer' }}><input type="radio" checked={ulbCalculationMode === 'population'} onChange={() => setUlbCalculationMode('population')} /> {lang === 'hi' ? 'जनसंख्या आधारित' : 'Population Based'}</label>
-              <label style={{ cursor: 'pointer' }}><input type="radio" checked={ulbCalculationMode === 'actual'} onChange={() => setUlbCalculationMode('actual')} /> {lang === 'hi' ? 'वास्तविक TPD' : 'Actual TPD'}</label>
+              <label style={{ cursor: 'pointer' }}><input type="radio" checked={ulbCalculationMode === 'actual'} onChange={() => setUlbCalculationMode('actual')} /> {lang === 'hi' ? 'वास्तविक TPD' : 'Actual Observed TPD'}</label>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', alignItems: 'center' }}>
@@ -535,101 +552,85 @@ export default function App() {
                       <option value="500">500 g/day</option>
                     </select>
                   </div>
-                  <div style={{ background: '#ecfdf5', padding: '8px 12px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
-                    <span style={{ fontSize: '11px', color: '#065f46', fontWeight: 'bold', display: 'block' }}>Calculated Gate Waste</span>
-                    <span style={{ fontSize: '16px', color: '#047857', fontWeight: '900' }}>{calculatedTpdDisplay} TPD</span>
-                  </div>
                 </>
               ) : (
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: '600' }}>Actual Waste Generation (TPD)</label>
-                  <input style={inputStyle} type="number" value={actualAverageTpd} onChange={(e) => setActualAverageTpd(e.target.value)} />
+                  <input style={inputStyle} type="number" step="0.1" value={actualAverageTpd} onChange={(e) => setActualAverageTpd(e.target.value)} />
                 </div>
               )}
 
+              <div style={{ background: '#ecfdf5', padding: '8px 12px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
+                <span style={{ fontSize: '11px', color: '#065f46', fontWeight: 'bold', display: 'block' }}>Target Gate Refuse</span>
+                <span style={{ fontSize: '16px', color: '#047857', fontWeight: '900' }}>{targetTotalTpd} TPD</span>
+              </div>
+            </div>
+          </div>
+
+          {/* DYNAMIC MULTI-ASSET FACILITY CONFIGURATOR */}
+          <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '6px', border: '1px solid #cbd5e1', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '10px' }}>
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#0f172a' }}>Source Segregation Rate: {segregationRate}%</label>
-                <input type="range" min="20" max="95" step="5" value={segregationRate} onChange={(e) => setSegregationRate(Number(e.target.value))} style={{ width: '100%', marginTop: '6px' }} />
+                <strong style={{ fontSize: '13px', color: '#0f172a' }}>2. Processing Facilities & Capacity Allocation</strong>
+                <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>Add custom processing assets. Total average processing must equal total gate intake.</span>
               </div>
-            </div>
-          </div>
 
-          {/* MIXED WASTE PROCESSING PLANT TOGGLE */}
-          <div style={{ background: '#fffbeb', padding: '12px', borderRadius: '6px', border: '1px solid #fde68a', marginBottom: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', color: '#92400e' }}>
-                <input type="checkbox" checked={enableMixedPlant} onChange={(e) => setEnableMixedPlant(e.target.checked)} />
-                <Settings2 size={16} /> Include Mixed Waste Processing Plant (Trommel / Pre-Sorting)
-              </label>
-
-              {enableMixedPlant && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '12px', color: '#78350f', fontWeight: '600' }}>Trommel Capacity:</span>
-                  <input type="number" value={mixedPlantCapacity} onChange={(e) => setMixedPlantCapacity(e.target.value)} style={{ width: '70px', padding: '4px', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
-                  <span style={{ fontSize: '12px', color: '#78350f' }}>TPD</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* COMPOST UNITS */}
-          <div style={{ background: '#f0fdf4', padding: '12px', borderRadius: '6px', border: '1px solid #bbf7d0', marginBottom: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <strong style={{ fontSize: '13px', color: '#166534' }}>Composting Assets (Wet Line)</strong>
-              <button type="button" onClick={addCompostUnit} style={{ padding: '6px 10px', background: '#047857', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Plus size={14} /> Add Compost Unit
-              </button>
+              {/* Mass Balance Indicator Badge */}
+              <div style={{ 
+                padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px',
+                background: isMassBalanced ? '#ecfdf5' : '#fef2f2',
+                color: isMassBalanced ? '#047857' : '#dc2626',
+                border: `1px solid ${isMassBalanced ? '#a7f3d0' : '#fca5a5'}`
+              }}>
+                {isMassBalanced ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                {isMassBalanced 
+                  ? `✓ Mass Balance 100% Validated (${totalAllocatedTpd} TPD)` 
+                  : `⚠️ Gate (${targetTotalTpd} TPD) ≠ Allocated (${totalAllocatedTpd} TPD)`
+                }
+              </div>
             </div>
 
             {/* COLUMN HEADERS */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr auto', gap: '8px', marginBottom: '4px', fontSize: '11px', fontWeight: 'bold', color: '#166534', paddingRight: '20px' }}>
-              <span>Asset Name</span>
-              <span>Type</span>
-              <span>Capacity (TPD)</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1fr auto', gap: '8px', marginBottom: '6px', fontSize: '11px', fontWeight: 'bold', color: '#475569', paddingRight: '10px' }}>
+              <span>Facility Name</span>
+              <span>Processing Stream Type</span>
+              <span>Design Capacity (TPD)</span>
+              <span>Avg Processing (TPD)</span>
               <span></span>
             </div>
 
-            {compostUnits.map((u) => (
-              <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr auto', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
-                <input type="text" value={u.label} onChange={(e) => updateCompostUnit(u.id, 'label', e.target.value)} style={{ ...inputStyle, marginTop: 0 }} />
-                <select value={u.type} onChange={(e) => updateCompostUnit(u.id, 'type', e.target.value)} style={{ ...inputStyle, marginTop: 0 }}>
-                  <option value="Windrow Pad">Windrow Pad</option>
-                  <option value="Vermicompost Pit">Vermicompost Pit</option>
+            {/* DYNAMIC ROWS */}
+            {facilities.map((f) => (
+              <div key={f.id} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1fr auto', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+                <input type="text" value={f.name} onChange={(e) => updateFacility(f.id, 'name', e.target.value)} style={{ ...inputStyle, marginTop: 0 }} placeholder="Unit Name" />
+                
+                <select value={f.type} onChange={(e) => updateFacility(f.id, 'type', e.target.value)} style={{ ...inputStyle, marginTop: 0 }}>
+                  <option value="wet_compost">🌱 Wet Waste Composting Pad</option>
+                  <option value="vermicompost">🪱 Vermicomposting Pit</option>
+                  <option value="dry_mrf">📦 Dry Material Recovery (MRF)</option>
+                  <option value="mixed_trommel">⚙️ Mixed Waste Trommel Line</option>
+                  <option value="biomethanation">⚡ Bio-methanation / Bio-CNG</option>
+                  <option value="hazardous_sanitary">☣️ Domestic Hazardous & Sanitary</option>
                 </select>
-                <input type="number" value={u.capacity} onChange={(e) => updateCompostUnit(u.id, 'capacity', e.target.value)} style={{ ...inputStyle, marginTop: 0 }} placeholder="TPD" />
-                {compostUnits.length > 1 && <button type="button" onClick={() => removeCompostUnit(u.id)} style={{ color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={16} /></button>}
+
+                <input type="number" step="0.1" value={f.designCapacity} onChange={(e) => updateFacility(f.id, 'designCapacity', Number(e.target.value))} style={{ ...inputStyle, marginTop: 0 }} placeholder="Cap TPD" />
+                <input type="number" step="0.1" value={f.avgProcessing} onChange={(e) => updateFacility(f.id, 'avgProcessing', Number(e.target.value))} style={{ ...inputStyle, marginTop: 0, fontWeight: 'bold', borderColor: isMassBalanced ? '#cbd5e1' : '#f87171' }} placeholder="Avg TPD" />
+
+                {facilities.length > 1 && (
+                  <button type="button" onClick={() => removeFacility(f.id)} style={{ color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={16} /></button>
+                )}
               </div>
             ))}
-          </div>
 
-          {/* MRF UNITS */}
-          <div style={{ background: '#f0f9ff', padding: '12px', borderRadius: '6px', border: '1px solid #bae6fd', marginBottom: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <strong style={{ fontSize: '13px', color: '#0369a1' }}>MRF / Sorting Shed Assets (Dry Line)</strong>
-              <button type="button" onClick={addMrfUnit} style={{ padding: '6px 10px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Plus size={14} /> Add MRF Shed
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
+              <button type="button" onClick={addFacility} style={{ padding: '6px 12px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Plus size={14} /> Add Processing Facility
+              </button>
+
+              <button type="button" onClick={autoBalanceAllocation} style={{ padding: '6px 12px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Zap size={14} /> Auto-Balance Mass Allocation
               </button>
             </div>
-
-            {/* COLUMN HEADERS */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr auto', gap: '8px', marginBottom: '4px', fontSize: '11px', fontWeight: 'bold', color: '#0369a1', paddingRight: '20px' }}>
-              <span>Asset Name</span>
-              <span>Type</span>
-              <span>Capacity (TPD)</span>
-              <span></span>
-            </div>
-
-            {mrfUnits.map((u) => (
-              <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr auto', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
-                <input type="text" value={u.label} onChange={(e) => updateMrfUnit(u.id, 'label', e.target.value)} style={{ ...inputStyle, marginTop: 0 }} />
-                <select value={u.type} onChange={(e) => updateMrfUnit(u.id, 'type', e.target.value)} style={{ ...inputStyle, marginTop: 0 }}>
-                  <option value="Manual Sorting Shed">Manual Sorting Shed</option>
-                  <option value="Semi-Automated Line">Semi-Automated Line</option>
-                </select>
-                <input type="number" value={u.capacity} onChange={(e) => updateMrfUnit(u.id, 'capacity', e.target.value)} style={{ ...inputStyle, marginTop: 0 }} placeholder="TPD" />
-                {mrfUnits.length > 1 && <button type="button" onClick={() => removeMrfUnit(u.id)} style={{ color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={16} /></button>}
-              </div>
-            ))}
           </div>
 
           {/* MONTH SELECTOR GRID */}
@@ -644,7 +645,7 @@ export default function App() {
             </div>
           </div>
 
-          <button type="submit" style={{ width: '100%', padding: '14px', background: '#047857', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px' }}>
+          <button type="submit" style={{ width: '100%', padding: '14px', background: isMassBalanced ? '#047857' : '#94a3b8', color: '#fff', border: 'none', borderRadius: '6px', cursor: isMassBalanced ? 'pointer' : 'not-allowed', fontWeight: 'bold', fontSize: '15px' }}>
             Generate Master Dataset (₹{pricing.total}) →
           </button>
         </form>
@@ -665,24 +666,12 @@ export default function App() {
             {/* ASSET SELECTOR SWITCHER */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', background: '#f1f5f9', padding: '8px', borderRadius: '6px' }}>
               <button type="button" onClick={() => setActiveAssetView('gate')} style={{ padding: '6px 10px', borderRadius: '4px', border: 'none', background: activeAssetView === 'gate' ? '#0f172a' : 'transparent', color: activeAssetView === 'gate' ? '#fff' : '#475569', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>
-                🏢 Gate Intake Sheet
+                🏢 Master Gate Intake Sheet
               </button>
 
-              {enableMixedPlant && (
-                <button type="button" onClick={() => setActiveAssetView('mixed')} style={{ padding: '6px 10px', borderRadius: '4px', border: 'none', background: activeAssetView === 'mixed' ? '#0f172a' : 'transparent', color: activeAssetView === 'mixed' ? '#fff' : '#475569', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>
-                  ⚙️ Pre-Sorting Plant
-                </button>
-              )}
-
-              {compostUnits.map(u => (
-                <button key={u.id} type="button" onClick={() => setActiveAssetView(u.id)} style={{ padding: '6px 10px', borderRadius: '4px', border: 'none', background: activeAssetView === u.id ? '#166534' : 'transparent', color: activeAssetView === u.id ? '#fff' : '#15803d', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>
-                  🌱 {u.label}
-                </button>
-              ))}
-
-              {mrfUnits.map(u => (
-                <button key={u.id} type="button" onClick={() => setActiveAssetView(u.id)} style={{ padding: '6px 10px', borderRadius: '4px', border: 'none', background: activeAssetView === u.id ? '#0369a1' : 'transparent', color: activeAssetView === u.id ? '#fff' : '#0284c7', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>
-                  📦 {u.label}
+              {facilities.map(f => (
+                <button key={f.id} type="button" onClick={() => setActiveAssetView(f.id)} style={{ padding: '6px 10px', borderRadius: '4px', border: 'none', background: activeAssetView === f.id ? '#047857' : 'transparent', color: activeAssetView === f.id ? '#fff' : '#047857', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>
+                  ⚙️ {f.name}
                 </button>
               ))}
             </div>
@@ -704,10 +693,19 @@ export default function App() {
                 <thead>
                   <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', textAlign: 'left' }}>
                     <th>Date</th><th>Day</th>
-                    {activeAssetView === 'gate' && <><th style={{ textAlign: 'right' }}>Gate Intake</th><th style={{ textAlign: 'right' }}>Seg. Wet</th><th style={{ textAlign: 'right' }}>Seg. Dry</th><th style={{ textAlign: 'right' }}>Mixed Waste</th></>}
-                    {activeAssetView === 'mixed' && <><th style={{ textAlign: 'right' }}>Mixed Intake</th><th style={{ textAlign: 'right' }}>Fine Organics</th><th style={{ textAlign: 'right' }}>Coarse RDF</th><th style={{ textAlign: 'right' }}>Inerts</th></>}
-                    {compostUnits.some(u => u.id === activeAssetView) && <><th style={{ textAlign: 'right' }}>Feed (Tons)</th><th style={{ textAlign: 'right' }}>Compost Yield (Tons)</th></>}
-                    {mrfUnits.some(u => u.id === activeAssetView) && <><th style={{ textAlign: 'right' }}>Feed (Tons)</th><th style={{ textAlign: 'right' }}>Recyclables</th><th style={{ textAlign: 'right' }}>RDF Dispatched</th></>}
+                    {activeAssetView === 'gate' && (
+                      <>
+                        <th style={{ textAlign: 'right' }}>Total Gate Refuse</th>
+                        {facilities.map(f => <th key={f.id} style={{ textAlign: 'right' }}>{f.name}</th>)}
+                      </>
+                    )}
+                    {facilities.some(f => f.id === activeAssetView) && (
+                      <>
+                        <th style={{ textAlign: 'right' }}>Facility Feed (Tons)</th>
+                        <th style={{ textAlign: 'right' }}>Primary Output</th>
+                        <th style={{ textAlign: 'right' }}>Secondary Fraction</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -718,33 +716,21 @@ export default function App() {
                       {activeAssetView === 'gate' && (
                         <>
                           <td style={{ textAlign: 'right' }}><strong>{formatVal(r.totalIntake)}</strong></td>
-                          <td style={{ textAlign: 'right' }}>{formatVal(r.wetSeg)}</td>
-                          <td style={{ textAlign: 'right' }}>{formatVal(r.drySeg)}</td>
-                          <td style={{ textAlign: 'right' }}>{formatVal(r.unsegregatedMixed)}</td>
+                          {facilities.map(f => (
+                            <td key={f.id} style={{ textAlign: 'right' }}>{formatVal(r.facilityBreakdown[f.id]?.intake)}</td>
+                          ))}
                         </>
                       )}
 
-                      {activeAssetView === 'mixed' && (
+                      {facilities.some(f => f.id === activeAssetView) && (
                         <>
-                          <td style={{ textAlign: 'right' }}><strong>{formatVal(r.unsegregatedMixed)}</strong></td>
-                          <td style={{ textAlign: 'right' }}>{formatVal(r.organicFines)}</td>
-                          <td style={{ textAlign: 'right' }}>{formatVal(r.dryOversize)}</td>
-                          <td style={{ textAlign: 'right' }}>{formatVal(r.heavyInerts)}</td>
-                        </>
-                      )}
-
-                      {compostUnits.some(u => u.id === activeAssetView) && (
-                        <>
-                          <td style={{ textAlign: 'right' }}><strong>{formatVal(r.compostUnitBreakdown[activeAssetView]?.feed)}</strong></td>
-                          <td style={{ textAlign: 'right' }}>{formatVal(r.compostUnitBreakdown[activeAssetView]?.compostYield)}</td>
-                        </>
-                      )}
-
-                      {mrfUnits.some(u => u.id === activeAssetView) && (
-                        <>
-                          <td style={{ textAlign: 'right' }}><strong>{formatVal(r.mrfUnitBreakdown[activeAssetView]?.feed)}</strong></td>
-                          <td style={{ textAlign: 'right' }}>{formatVal(r.mrfUnitBreakdown[activeAssetView]?.recyclables)}</td>
-                          <td style={{ textAlign: 'right' }}>{formatVal(r.mrfUnitBreakdown[activeAssetView]?.rdf)}</td>
+                          <td style={{ textAlign: 'right' }}><strong>{formatVal(r.facilityBreakdown[activeAssetView]?.intake)}</strong></td>
+                          <td style={{ textAlign: 'right' }}>
+                            {formatVal(r.facilityBreakdown[activeAssetView]?.compostYield || r.facilityBreakdown[activeAssetView]?.recyclables || r.facilityBreakdown[activeAssetView]?.organicFines || r.facilityBreakdown[activeAssetView]?.biogasGenerated || r.facilityBreakdown[activeAssetView]?.safeStorage)}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            {formatVal(r.facilityBreakdown[activeAssetView]?.rejects || r.facilityBreakdown[activeAssetView]?.rdf || r.facilityBreakdown[activeAssetView]?.coarseRdf || r.facilityBreakdown[activeAssetView]?.digestate || r.facilityBreakdown[activeAssetView]?.dispatchedTsdf)}
+                          </td>
                         </>
                       )}
                     </tr>
@@ -804,7 +790,7 @@ export default function App() {
                 <div>
                   <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Services & Pricing (INR)</h2>
                   <ul style={{ fontSize: '12px', lineHeight: '1.8' }}>
-                    <li>Integrated 3-in-1 Master Suite: ₹500 / Month (Includes Gate, Compost, MRF & Pre-Sorting Plant Tabs)</li>
+                    <li>Integrated 3-in-1 Master Suite: ₹500 / Month (Includes Mass Balance Gate & Dynamic Processing Tabs)</li>
                   </ul>
                 </div>
               )}
