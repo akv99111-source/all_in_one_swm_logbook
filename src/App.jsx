@@ -128,9 +128,20 @@ export default function App() {
   const isSegBalanced = Math.abs(targetSegregatedTpd - allocatedSegregated) <= 0.02;
   const isMassBalanced = isMixedBalanced && isSegBalanced;
 
+  // NEW: MRF Fractions 100% Validation
+  const invalidMrfs = facilities.filter(f => {
+    if (f.type !== 'dry_mrf') return false;
+    const totalPct = (f.mrfFractions || []).reduce((sum, frac) => sum + Number(frac.percentage || 0), 0);
+    return totalPct !== 100;
+  });
+  
+  const isMrfBalanced = invalidMrfs.length === 0;
+  const isFullyValidated = isMassBalanced && isMrfBalanced;
+
   let validationMsg = "✓ Dual-Stream Mass Balance 100% Validated";
   if (!isSegBalanced) validationMsg = `⚠️ Segregated Imbalance (Target ${targetSegregatedTpd} vs Allocated ${allocatedSegregated})`;
   else if (!isMixedBalanced) validationMsg = `⚠️ Mixed Imbalance (Target ${targetMixedTpd} vs Allocated ${allocatedMixed})`;
+  else if (!isMrfBalanced) validationMsg = `⚠️ MRF Fractions must equal 100% (${invalidMrfs.map(f => f.name).join(', ')})`;
 
   // Facility Management Functions
   const addFacility = () => {
@@ -267,8 +278,8 @@ export default function App() {
 
   const handleGenerate = (e) => {
     e.preventDefault();
-    if (!isMassBalanced) {
-      alert(`Validation Error: ${validationMsg}\n\nClick the "Auto-Balance Streams" button to mathematically distribute waste properly.`);
+    if (!isFullyValidated) {
+      alert(`Validation Error: ${validationMsg}\n\nPlease fix the errors before generating the dataset.`);
       return;
     }
 
@@ -568,7 +579,7 @@ export default function App() {
                 <li style={{ marginBottom: '6px' }}><strong>बुनियादी विवरण दर्ज करें:</strong> अपने राज्य का चयन करें, अपनी निकाय/प्लांट का नाम लिखें और मोबाइल नंबर दर्ज करें।</li>
                 <li style={{ marginBottom: '6px' }}><strong>कचरा क्षमता मोड चुनें:</strong> जनसंख्या आधारित (450 ग्राम/दिन) या वास्तविक तौल का TPD दर्ज करें।</li>
                 <li style={{ marginBottom: '6px' }}><strong>स्रोत पृथक्करण दर (%):</strong> पृथक्कृत (Segregated) और मिश्रित (Mixed) कचरे का प्रतिशत सेट करें।</li>
-                <li style={{ marginBottom: '6px' }}><strong>प्रोसेसिंग फैसिलिटीज:</strong> अपनी सभी प्रोसेसिंग यूनिट्स (कम्पोस्ट, MRF, ट्रॉमेल) जोड़ें। MRF में कस्टम मटेरियल फ्रैक्शन जोड़ें। सुनिश्चित करें कि औसत प्रोसेसिंग (Average Processing TPD) का योग कुल गेट कचरे के बराबर हो। ट्रॉमेल प्लांट हमेशा मिश्रित कचरा लेगा।</li>
+                <li style={{ marginBottom: '6px' }}><strong>प्रोसेसिंग फैसिलिटीज:</strong> अपनी सभी प्रोसेसिंग यूनिट्स (कम्पोस्ट, MRF, ट्रॉमेल) जोड़ें। MRF में कस्टम मटेरियल फ्रैक्शन जोड़ें और सुनिश्चित करें कि उनका कुल योग 100% हो। सुनिश्चित करें कि औसत प्रोसेसिंग (Average Processing TPD) का योग कुल गेट कचरे के बराबर हो। ट्रॉमेल प्लांट हमेशा मिश्रित कचरा लेगा।</li>
                 <li style={{ marginBottom: '6px' }}><strong>महीने चुनें:</strong> आवश्यकतानुसार महीने चुनें (हर 6ठा महीना बिल्कुल मुफ्त है)।</li>
                 <li style={{ marginBottom: '6px' }}><strong>डेटासेट जनरेट करें:</strong> पहले 5 दिनों का मुफ्त पूर्वावलोकन (Preview) देखें, फिर भुगतान पूरा करके पूरे महीने की Multi-Sheet Excel Workbook (.xlsx) डाउनलोड करें।</li>
               </ol>
@@ -582,7 +593,7 @@ export default function App() {
                 <li style={{ marginBottom: '6px' }}><strong>Enter Basic Details:</strong> Select your State, type your ULB/Facility Name, and provide a mobile number.</li>
                 <li style={{ marginBottom: '6px' }}><strong>Choose Waste Calculation Mode:</strong> Population-based (450 g/person/day) or Actual weighed TPD.</li>
                 <li style={{ marginBottom: '6px' }}><strong>Set Segregation Rate (%):</strong> Balance Segregated waste vs Mixed unsegregated waste.</li>
-                <li style={{ marginBottom: '6px' }}><strong>Configure Processing Assets:</strong> Add processing facilities. Customize sub-fractions for MRF units. Any Mixed Waste Trommel will auto-process your mixed stream. Ensure Average Processing exactly equals Total Gate Generation.</li>
+                <li style={{ marginBottom: '6px' }}><strong>Configure Processing Assets:</strong> Add processing facilities. Customize sub-fractions for MRF units ensuring they equal 100%. Any Mixed Waste Trommel will auto-process your mixed stream. Ensure Average Processing exactly equals Total Gate Generation.</li>
                 <li style={{ marginBottom: '6px' }}><strong>Select Duration:</strong> Click month buttons to choose duration (every 6th month is free).</li>
                 <li style={{ marginBottom: '6px' }}><strong>Preview & Export:</strong> Review the first 5 days for free, then complete payment to download the full Multi-Sheet Excel workbook (`.xlsx`).</li>
               </ol>
@@ -672,14 +683,14 @@ export default function App() {
                 <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>Trommels will auto-route the Mixed Stream. Other facilities route Segregated Streams.</span>
               </div>
 
-              {/* DUAL-STREAM Mass Balance Indicator Badge */}
+              {/* DUAL-STREAM & MRF Mass Balance Indicator Badge */}
               <div style={{ 
                 padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px',
-                background: isMassBalanced ? '#ecfdf5' : '#fef2f2',
-                color: isMassBalanced ? '#047857' : '#dc2626',
-                border: `1px solid ${isMassBalanced ? '#a7f3d0' : '#fca5a5'}`
+                background: isFullyValidated ? '#ecfdf5' : '#fef2f2',
+                color: isFullyValidated ? '#047857' : '#dc2626',
+                border: `1px solid ${isFullyValidated ? '#a7f3d0' : '#fca5a5'}`
               }}>
-                {isMassBalanced ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                {isFullyValidated ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
                 {validationMsg}
               </div>
             </div>
@@ -720,11 +731,18 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* NESTED MRF FRACTIONS EDITOR */}
+                  {/* NESTED MRF FRACTIONS EDITOR WITH 100% VALIDATION */}
                   {f.type === 'dry_mrf' && (
                     <div style={{ marginTop: '10px', marginLeft: '10px', background: '#f1f5f9', padding: '10px', borderRadius: '6px', borderLeft: '3px solid #0ea5e9' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#0369a1' }}>Customize MRF Fractions (%)</span>
+                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#0369a1' }}>
+                          Customize MRF Fractions (%)
+                          {(() => {
+                            const pct = (f.mrfFractions || []).reduce((s, fr) => s + Number(fr.percentage || 0), 0);
+                            if (pct !== 100) return <span style={{ color: '#dc2626', marginLeft: '6px' }}>(⚠️ Total: {pct}% - Must be 100%)</span>;
+                            return <span style={{ color: '#15803d', marginLeft: '6px' }}>(✓ 100%)</span>;
+                          })()}
+                        </span>
                         <button type="button" onClick={() => addMrfFraction(f.id)} style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}>
                           <Plus size={12} /> Add Fraction
                         </button>
@@ -768,7 +786,7 @@ export default function App() {
             </div>
           </div>
 
-          <button type="submit" style={{ width: '100%', padding: '14px', background: isMassBalanced ? '#047857' : '#94a3b8', color: '#fff', border: 'none', borderRadius: '6px', cursor: isMassBalanced ? 'pointer' : 'not-allowed', fontWeight: 'bold', fontSize: '15px' }}>
+          <button type="submit" style={{ width: '100%', padding: '14px', background: isFullyValidated ? '#047857' : '#94a3b8', color: '#fff', border: 'none', borderRadius: '6px', cursor: isFullyValidated ? 'pointer' : 'not-allowed', fontWeight: 'bold', fontSize: '15px' }}>
             Generate Master Dataset (₹{pricing.total}) →
           </button>
         </form>
