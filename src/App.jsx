@@ -1033,7 +1033,7 @@ export default function App() {
             <button type="button" onClick={() => setActivePolicyModal('refunds')} style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>Refunds & Cancellations</button> |
             <button type="button" onClick={() => setActivePolicyModal('pricing')} style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>Services & Pricing (INR)</button>
           </div>
-          <p style={{ margin: 0 }}>© {new Date().getFullYear()} Consilience Research Foundation / SWM Suite. All Rights Reserved.</p>
+          <p style={{ margin: 0 }}>© {new Date().getFullYear()} CRF / SWM Suite. All Rights Reserved.</p>
         </footer>
 
         {/* POLICY MODAL */}
@@ -1043,7 +1043,7 @@ export default function App() {
               {activePolicyModal === 'contact' && (
                 <div>
                   <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Contact Us</h2>
-                  <p style={{ fontSize: '13px' }}><strong>Organisation:</strong> Consilience Research Foundation</p>
+                  <p style={{ fontSize: '13px' }}><strong>Organisation:</strong> CRF</p>
                   <p style={{ fontSize: '13px' }}><strong>Address:</strong> Lucknow, Uttar Pradesh, India</p>
                   <p style={{ fontSize: '13px' }}><strong>Email (for any query/feedback & support):</strong> crginfomail@gmail.com</p>
                 </div>
