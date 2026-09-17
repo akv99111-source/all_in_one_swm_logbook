@@ -410,7 +410,7 @@ export default function App() {
     setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   };
 
-  const handlePayment = async () => {
+const handlePayment = async () => {
     if (!phone || phone.length < 10) {
       alert(lang === 'hi' ? 'कृपया एक वैध 10-अंकों का मोबाइल नंबर दर्ज करें।' : 'Please enter a valid 10-digit mobile number.');
       return;
@@ -428,7 +428,8 @@ export default function App() {
     }
 
     try {
-      const res = await fetch('/api/create-order', {
+      // Routed to the standalone backend domain
+      const res = await fetch('https://swm-standalone-tool.vercel.app/api/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: pricing.total, customerName: name, customerPhone: phone })
