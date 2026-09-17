@@ -1025,13 +1025,13 @@ export default function App() {
           </div>
         )}
 
-        {/* COMPLIANCE FOOTER */}
+      {/* COMPLIANCE FOOTER */}
         <footer style={{ marginTop: '40px', paddingTop: '20px', borderTop: '1px solid #cbd5e1', textAlign: 'center', fontSize: '12px', color: '#64748b' }}>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginBottom: '10px' }}>
-            <button type="button" onClick={() => setActivePolicyModal('contact')} style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>Contact Us</button> |
-            <button type="button" onClick={() => setActivePolicyModal('terms')} style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>Terms & Conditions</button> |
-            <button type="button" onClick={() => setActivePolicyModal('refunds')} style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>Refunds & Cancellations</button> |
-            <button type="button" onClick={() => setActivePolicyModal('pricing')} style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>Services & Pricing (INR)</button>
+            <button type="button" onClick={() => setActivePolicyModal('contact')} style={{ background: 'none', border: 'none', color: '#047857', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>Contact Us</button> |
+            <button type="button" onClick={() => setActivePolicyModal('terms')} style={{ background: 'none', border: 'none', color: '#047857', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>Terms & Conditions</button> |
+            <button type="button" onClick={() => setActivePolicyModal('refunds')} style={{ background: 'none', border: 'none', color: '#047857', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>Refunds & Cancellations</button> |
+            <button type="button" onClick={() => setActivePolicyModal('pricing')} style={{ background: 'none', border: 'none', color: '#047857', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>Services & Pricing (INR)</button>
           </div>
           <p style={{ margin: 0 }}>© {new Date().getFullYear()} CRF / SWM Suite. All Rights Reserved.</p>
         </footer>
@@ -1044,8 +1044,8 @@ export default function App() {
                 <div>
                   <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Contact Us</h2>
                   <p style={{ fontSize: '13px' }}><strong>Organisation:</strong> CRF</p>
-                  <p style={{ fontSize: '13px' }}><strong>Address:</strong> Lucknow, Uttar Pradesh, India</p>
-                  <p style={{ fontSize: '13px' }}><strong>Email (for any query/feedback & support):</strong> crginfomail@gmail.com</p>
+                  <p style={{ fontSize: '13px' }}><strong>Address:</strong> Lucknow, UP, India, 226002</p>
+                  <p style={{ fontSize: '13px' }}><strong>Email:</strong> crginfomail@gmail.com</p>
                 </div>
               )}
               {activePolicyModal === 'terms' && (
@@ -1064,16 +1064,13 @@ export default function App() {
                 <div>
                   <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Services & Pricing (INR)</h2>
                   <ul style={{ fontSize: '12px', lineHeight: '1.8' }}>
-                    <li>Integrated 3-in-1 Master Suite: ₹500 / Month (Includes Mass Balance Gate & Dynamic Processing Tabs)</li>
+                    <li>Integrated Master Suite: ₹500 / Month (Includes Mass Balance Gate & Dynamic Processing Tabs)</li>
                   </ul>
                 </div>
               )}
-              <button type="button" onClick={() => setActivePolicyModal(null)} style={{ marginTop: '15px', padding: '8px 16px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Close</button>
+              <button type="button" onClick={() => setActivePolicyModal(null)} style={{ marginTop: '15px', padding: '8px 16px', background: '#047857', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Close</button>
             </div>
           </div>
         )}
 
-      </div>
-    </div>
-  );
-}
+     
