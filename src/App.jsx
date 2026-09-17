@@ -590,9 +590,9 @@ export default function App() {
               {lang === 'hi' ? 'किसी एक विशिष्ट इकाई (केवल ULB, केवल MRF, या मिश्रित कचरा प्लांट) के लिए अलग से लॉग-बुक जनरेट करें।' : 'Use our standalone tool to quickly generate isolated logs for just one ULB collection, a single MRF, or a mixed waste plant.'}
             </p>
           </div>
-          <a href="https://ulb-waste-generator.vercel.app/" style={{ textDecoration: 'none', padding: '8px 14px', background: '#334155', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
-            <ArrowLeft size={14} /> Open Standalone App
-          </a>
+          <a href="https://swm-standalone-tool.vercel.app/" style={{ textDecoration: 'none', padding: '8px 14px', background: '#334155', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+  <ArrowLeft size={14} /> Open Standalone App
+</a>
         </div>
 
         {/* BILINGUAL USER GUIDE CONTAINER */}
