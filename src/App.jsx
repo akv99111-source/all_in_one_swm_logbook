@@ -83,7 +83,6 @@ export default function App() {
   
   const [segregationRate, setSegregationRate] = useState(80);
 
-  // Dynamic Facilities with Nested MRF Fractions
   const [facilities, setFacilities] = useState([
     { id: 'f1', name: 'Windrow Compost Pad', type: 'wet_compost', designCapacity: 12, avgProcessing: 10.8 },
     { 
@@ -113,7 +112,6 @@ export default function App() {
   const resultsRef = useRef(null);
   const parsedPerCapita = Number(perCapitaOption);
   
-  // CORE DUAL-STREAM MASS BALANCE CALCULATIONS
   const targetTotalTpd = ulbCalculationMode === 'population' 
     ? Number(((Number(population) * parsedPerCapita) / 1000000).toFixed(2))
     : Number(Number(actualAverageTpd || 0).toFixed(2));
@@ -128,7 +126,6 @@ export default function App() {
   const isSegBalanced = Math.abs(targetSegregatedTpd - allocatedSegregated) <= 0.02;
   const isMassBalanced = isMixedBalanced && isSegBalanced;
 
-  // MRF Fractions 100% Validation
   const invalidMrfs = facilities.filter(f => {
     if (f.type !== 'dry_mrf') return false;
     const totalPct = (f.mrfFractions || []).reduce((sum, frac) => sum + Number(frac.percentage || 0), 0);
@@ -143,7 +140,6 @@ export default function App() {
   else if (!isMixedBalanced) validationMsg = `⚠️ Mixed Imbalance (Target ${targetMixedTpd} vs Allocated ${allocatedMixed})`;
   else if (!isMrfBalanced) validationMsg = `⚠️ MRF Fractions must equal 100% (${invalidMrfs.map(f => f.name).join(', ')})`;
 
-  // Facility Management Functions
   const addFacility = () => {
     setFacilities([
       ...facilities,
@@ -170,7 +166,6 @@ export default function App() {
     setFacilities(facilities.map(f => f.id === id ? { ...f, [field]: value } : f));
   };
 
-  // MRF Fraction Management
   const addMrfFraction = (facilityId) => {
     setFacilities(facilities.map(f => {
       if (f.id === facilityId) {
@@ -290,16 +285,15 @@ export default function App() {
       const seedString = `INTEGRATED-MASS-BALANCE-V7-${selectedState}-${name}-${startYear}-${m}-${targetTotalTpd}-${segregationRate}`;
       const random = mulberry32(cyrb128(seedString));
       
-      // SEASONAL VARIATION LOGIC
       let seasonalGateMultiplier = 1.0;
       let seasonalCompostBaseYield = 0.18;
       
       if ([7, 8, 9].includes(m)) {
-        seasonalGateMultiplier = 1.05; // Monsoon: ~5% heavier due to wet waste
-        seasonalCompostBaseYield = 0.16; // Monsoon: Lower dry compost yield from heavy wet feed
+        seasonalGateMultiplier = 1.05; 
+        seasonalCompostBaseYield = 0.16; 
       } else if ([4, 5, 6].includes(m)) {
-        seasonalGateMultiplier = 0.95; // Summer: ~5% lighter due to dryness
-        seasonalCompostBaseYield = 0.20; // Summer: Higher efficiency
+        seasonalGateMultiplier = 0.95; 
+        seasonalCompostBaseYield = 0.20; 
       }
 
       let logs = [];
@@ -308,7 +302,6 @@ export default function App() {
         const dateStr = `${startYear}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const dayName = new Date(startYear, m - 1, day).toLocaleDateString('en-US', { weekday: 'short' });
 
-        // Apply Natural Daily Noise + Seasonal Modifier to Gate Intake
         let dailyNoise = 0.95 + random() * 0.10;
         const dailyGateTotal = Number((targetTotalTpd * dailyNoise * seasonalGateMultiplier).toFixed(3));
         
@@ -324,7 +317,6 @@ export default function App() {
             const ratio = allocatedMixed > 0 ? f.avgProcessing / allocatedMixed : 0;
             fIntake = Number((dailyMixed * ratio).toFixed(3));
             
-            // Fines and RDF natural noise, remaining balance to inerts
             const finesNoise = 0.85 + random() * 0.30;
             const rdfNoise = 0.85 + random() * 0.30;
             const organicFines = Number((fIntake * 0.45 * finesNoise).toFixed(3));
@@ -340,7 +332,6 @@ export default function App() {
             if (f.type === 'wet_compost' || f.type === 'vermicompost') {
               const yieldNoise = 0.85 + random() * 0.30;
               const rejectNoise = 0.80 + random() * 0.40;
-              // Enzyme dose increases slightly during monsoon
               const enzymeMult = [7,8,9].includes(m) ? 1.2 : 1.0; 
               
               outputs = {
@@ -358,7 +349,6 @@ export default function App() {
               let accumulatedWeight = 0;
               fractions.forEach((frac, index) => {
                 if (index === fractions.length - 1) {
-                  // Final fraction perfectly balances to 100% of input
                   fractionBreakdown[frac.id] = Number(Math.max(0, fIntake - accumulatedWeight).toFixed(3));
                 } else {
                   const fracNoise = 0.85 + random() * 0.30;
@@ -444,7 +434,14 @@ export default function App() {
         body: JSON.stringify({ amount: pricing.total, customerName: name, customerPhone: phone })
       });
 
-      const order = await res.json();
+      const rawText = await res.text();
+      let order;
+      try {
+        order = JSON.parse(rawText);
+      } catch (err) {
+        throw new Error(`Server returned non-JSON response: ${rawText.substring(0, 50)}`);
+      }
+
       if (!order.payment_session_id) throw new Error(order.message || 'Failed to initialize payment session.');
 
       const cashfree = window.Cashfree({ mode: import.meta.env.VITE_CASHFREE_MODE || 'production' });
@@ -478,14 +475,12 @@ export default function App() {
     try {
       const u = displayUnit === 'kg' ? 'kg' : 'Tons';
 
-      // Iterate through each selected month and download a separate file
       selectedMonths.forEach((mId) => {
         const wb = XLSX.utils.book_new();
         const monthData = MONTHS.find(m => m.id === mId);
         const monthName = monthData?.shortEn || `M${mId}`;
         const fullMonthName = monthData?.fullEn || `Month${mId}`;
 
-        // 1. Master Gate Intake Sheet
         const gateHeaders = ["Date", "Day", `Total Gate Intake (${u})`, `Segregated Stream (${u})`, `Mixed Stream (${u})`, ...facilities.map(f => `${f.name} Allocated (${u})`)];
         const gateRows = generatedMonthlyData[mId].map(r => [
           r.date, r.dayName, formatVal(r.totalIntake), formatVal(r.dailySegregated), formatVal(r.dailyMixed),
@@ -493,7 +488,6 @@ export default function App() {
         ]);
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([gateHeaders, ...gateRows]), `${monthName}_GateIntake`);
 
-        // 2. Stream-Specific Detailed Logbooks
         facilities.forEach((f, idx) => {
           let headers = [];
           let rows = [];
@@ -549,7 +543,6 @@ export default function App() {
           XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers, ...rows]), safeSheetName);
         });
 
-        // Save a separate file for this specific month
         const safeFileName = `Integrated_Master_Suite_${name.replace(/\s+/g, '_')}_${fullMonthName}_${startYear}.xlsx`;
         XLSX.writeFile(wb, safeFileName);
       });
@@ -560,8 +553,6 @@ export default function App() {
   };
 
   const activeRows = generatedMonthlyData?.[activeTabMonth] || [];
-  
-  // STRICT 5-DAY PREVIEW LOCK FOR UNPAID SESSIONS
   const visibleRows = isPaid ? activeRows : activeRows.slice(0, 5);
 
   return (
@@ -579,6 +570,9 @@ export default function App() {
                 <Building2 size={22} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
                 {lang === 'hi' ? 'एकीकृत 3-इन-1 मास्टर लॉग-बुक सुइट' : 'Integrated 3-in-1 Master Logbook Suite'}
               </h1>
+              <p style={{ fontSize: '12px', color: '#a7f3d0', margin: '0' }}>
+                {lang === 'hi' ? 'यह टूल केवल शोध, शिक्षा और अनुमान के उद्देश्यों के लिए है।' : 'This tool is strictly for research, education, and estimation purposes only.'}
+              </p>
             </div>
             <button type="button" onClick={() => setLang(lang === 'hi' ? 'en' : 'hi')} style={{ padding: '6px 12px', background: '#fff', color: '#047857', border: 'none', borderRadius: '5px', fontWeight: 'bold', cursor: 'pointer' }}>
               <Globe size={15} style={{ verticalAlign: 'middle' }} /> {lang === 'hi' ? 'English' : 'हिंदी'}
@@ -589,10 +583,14 @@ export default function App() {
         {/* CROSS-LINK BANNER */}
         <div style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
           <div>
-            <h3 style={{ margin: 0, color: '#334155', fontSize: '14px' }}>{lang === 'hi' ? 'सिंगल-फैसिलिटी लॉग-बुक चाहिए?' : 'Need Single-Facility Logbooks?'}</h3>
-            <p style={{ margin: 0, color: '#64748b', fontSize: '12px' }}>{lang === 'hi' ? 'केवल ₹100/माह में साधारण ULB/MRF जनरेटर खोलें।' : 'Use our standalone ULB, MRF, or Mixed waste tool starting at ₹100/mo.'}</p>
+            <h3 style={{ margin: 0, color: '#334155', fontSize: '14px' }}>
+              {lang === 'hi' ? 'सिंगल-फैसिलिटी लॉग-बुक चाहिए?' : 'Need a Simple Single-Facility Logbook?'}
+            </h3>
+            <p style={{ margin: 0, color: '#64748b', fontSize: '12px' }}>
+              {lang === 'hi' ? 'किसी एक विशिष्ट इकाई (केवल ULB, केवल MRF, या मिश्रित कचरा प्लांट) के लिए अलग से लॉग-बुक जनरेट करें।' : 'Use our standalone tool to quickly generate isolated logs for just one ULB collection, a single MRF, or a mixed waste plant.'}
+            </p>
           </div>
-          <a href="https://ulb-waste-generator.vercel.app/" style={{ textDecoration: 'none', padding: '8px 14px', background: '#334155', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <a href="https://ulb-waste-generator.vercel.app/" style={{ textDecoration: 'none', padding: '8px 14px', background: '#334155', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
             <ArrowLeft size={14} /> Open Standalone App
           </a>
         </div>
@@ -1025,7 +1023,22 @@ export default function App() {
           </div>
         )}
 
-      {/* COMPLIANCE FOOTER */}
+        {/* SEO & ADSENSE CONTENT BLOCK */}
+        <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #cbd5e1', marginTop: '30px', color: '#334155', lineHeight: '1.6' }}>
+          <h2 style={{ fontSize: '18px', color: '#0f172a', borderBottom: '2px solid #e2e8f0', paddingBottom: '8px' }}>About Solid Waste Management (SWM) Logbook Estimation</h2>
+          
+          <h3 style={{ fontSize: '15px', marginTop: '16px', color: '#0369a1' }}>The Importance of Daily Mass Balance in SWM</h3>
+          <p style={{ fontSize: '13px' }}>
+            Proper Solid Waste Management (SWM) requires meticulous daily tracking of incoming municipal solid waste (MSW). Urban Local Bodies (ULBs) and municipal corporations must maintain accurate logbooks to ensure compliance with the Solid Waste Management Rules and other global environmental standards. A mass balance approach ensures that total gate intake matches the processed outputs (segregated organics, recyclables, and inert rejects), preventing unaccounted waste dumping.
+          </p>
+
+          <h3 style={{ fontSize: '15px', marginTop: '16px', color: '#0369a1' }}>How This Estimation Tool Works</h3>
+          <p style={{ fontSize: '13px' }}>
+            This integrated logbook generator is a specialized calculator designed for environmental engineers, facility operators, and academic researchers. By inputting the baseline population or known daily TPD (Tons Per Day), the algorithm applies standard per-capita generation rates. It uses advanced deterministic variations to simulate natural daily fluctuations in waste collection, accounting for seasonal changes.
+          </p>
+        </div>
+
+        {/* COMPLIANCE FOOTER */}
         <footer style={{ marginTop: '40px', paddingTop: '20px', borderTop: '1px solid #cbd5e1', textAlign: 'center', fontSize: '12px', color: '#64748b' }}>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginBottom: '10px' }}>
             <button type="button" onClick={() => setActivePolicyModal('contact')} style={{ background: 'none', border: 'none', color: '#047857', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>Contact Us</button> |
@@ -1073,4 +1086,7 @@ export default function App() {
           </div>
         )}
 
-     
+      </div>
+    </div>
+  );
+}
