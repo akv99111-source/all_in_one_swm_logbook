@@ -428,13 +428,11 @@ const handlePayment = async () => {
     }
 
     try {
-      // Routed to the standalone backend domain
-      const res = await fetch('https://swm-standalone-tool.vercel.app/api/create-order', {
+ const res = await fetch('/api/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: pricing.total, customerName: name, customerPhone: phone })
       });
-
       const rawText = await res.text();
       let order;
       try {
