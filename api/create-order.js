@@ -10,7 +10,6 @@ export default async function handler(req, res) {
     const isProd = process.env.VITE_CASHFREE_MODE === 'production';
     const url = isProd ? 'https://api.cashfree.com/pg/orders' : 'https://sandbox.cashfree.com/pg/orders';
 
-    // THIS IS THE MISSING PIECE THAT CAUSES THE REFERENCE ERROR!
     const orderPayload = {
       order_amount: amount,
       order_currency: "INR",
@@ -29,7 +28,7 @@ export default async function handler(req, res) {
         'x-client-secret': secretKey,
         'x-api-version': '2023-08-01'
       },
-      body: JSON.stringify(orderPayload) // It was crashing here because it didn't know what orderPayload was
+      body: JSON.stringify(orderPayload)
     });
 
     const data = await response.json();
