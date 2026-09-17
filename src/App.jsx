@@ -426,12 +426,7 @@ const handlePayment = async () => {
         document.body.appendChild(s);
       });
     }
-
     try {
-// Change this:
-      // const res = await fetch('https://swm-standalone-tool.vercel.app/api/create-order', {
-
-      // Back to this:
       const res = await fetch('/api/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
