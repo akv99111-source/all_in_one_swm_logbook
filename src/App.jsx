@@ -110,7 +110,7 @@ export default function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [activePolicyModal, setActivePolicyModal] = useState(null);
 
-  resultsRef = useRef(null);
+ const resultsRef = useRef(null);
 
   // Catch URL parameters when redirected from standalone app and auto-trigger payment
   useEffect(() => {
