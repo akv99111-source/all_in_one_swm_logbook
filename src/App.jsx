@@ -75,6 +75,7 @@ export default function App() {
   const [selectedState, setSelectedState] = useState('Uttar Pradesh');
   const [name, setName] = useState('Nagar Palika Parishad');
   const [phone, setPhone] = useState('');
+  const [overrideAmount, setOverrideAmount] = useState(null);
   
   const [ulbCalculationMode, setUlbCalculationMode] = useState('population');
   const [population, setPopulation] = useState(50000);
@@ -109,14 +110,23 @@ export default function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [activePolicyModal, setActivePolicyModal] = useState(null);
 
-  const resultsRef = useRef(null);
+  resultsRef = useRef(null);
 
-  // Catch parameters if redirected from standalone app
+  // Catch URL parameters when redirected from standalone app and auto-trigger payment
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const passedPhone = params.get('phone');
-    if (passedPhone) {
-      setPhone(passedPhone);
+    const passedAmount = params.get('amount');
+    const autoPay = params.get('autoPay');
+
+    if (passedPhone) setPhone(passedPhone);
+    if (passedAmount) setOverrideAmount(Number(passedAmount));
+
+    if (autoPay === 'true') {
+      const timer = setTimeout(() => {
+        handlePayment();
+      }, 1000);
+      return () => clearTimeout(timer);
     }
   }, []);
 
@@ -276,7 +286,7 @@ export default function App() {
     const baseRate = 500;
     const baseTotal = billableMonths * baseRate;
     const finalTotalWithCharges = Math.round(baseTotal / (1 - 0.0236));
-    return { count, freeMonths, billableMonths, baseTotal, total: finalTotalWithCharges };
+    return { count, freeMonths, billableMonths, baseTotal, total: overrideAmount || finalTotalWithCharges };
   };
 
   const pricing = getPricingDetails();
