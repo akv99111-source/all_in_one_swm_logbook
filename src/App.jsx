@@ -110,6 +110,16 @@ export default function App() {
   const [activePolicyModal, setActivePolicyModal] = useState(null);
 
   const resultsRef = useRef(null);
+
+  // Catch parameters if redirected from standalone app
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const passedPhone = params.get('phone');
+    if (passedPhone) {
+      setPhone(passedPhone);
+    }
+  }, []);
+
   const parsedPerCapita = Number(perCapitaOption);
   
   const targetTotalTpd = ulbCalculationMode === 'population' 
@@ -410,7 +420,7 @@ export default function App() {
     setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   };
 
-const handlePayment = async () => {
+  const handlePayment = async () => {
     if (!phone || phone.length < 10) {
       alert(lang === 'hi' ? 'कृपया एक वैध 10-अंकों का मोबाइल नंबर दर्ज करें।' : 'Please enter a valid 10-digit mobile number.');
       return;
@@ -589,8 +599,8 @@ const handlePayment = async () => {
             </p>
           </div>
           <a href="https://swm-standalone-tool.vercel.app/" style={{ textDecoration: 'none', padding: '8px 14px', background: '#334155', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
-  <ArrowLeft size={14} /> Open Standalone App
-</a>
+            <ArrowLeft size={14} /> Open Standalone App
+          </a>
         </div>
 
         {/* BILINGUAL USER GUIDE CONTAINER */}
